@@ -28,7 +28,10 @@ jobs:
           git config --global pull.rebase true
           git config --global rebase.autoStash true
           git config --global fetch.prune true
-          git config --global --add safe.directory /__w/*
+          for d in /__w/*; do
+            git config --global --add safe.directory "$d" || true
+          done
+
 
       - uses: actions/checkout@v4
         with:
