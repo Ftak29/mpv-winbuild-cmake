@@ -82,16 +82,47 @@ jobs:
             ${{ secrets.CACHE_VERSION }}-clang-x86_64_toolchain-${{ github.ref_name }}-
             ${{ secrets.CACHE_VERSION }}-clang-x86_64_toolchain-
 
-      - name: Force toolchain PATH (clang_root)
+      - name: Force toolchain PATH (clang_root + rust)
         run: |
           set -euxo pipefail
+
+          # clang/lld from the toolchain
           echo "$PWD/clang_root/bin" >> "$GITHUB_PATH"
-          echo "$PWD/clang_root/install_rustup/bin" >> "$GITHUB_PATH"
+
+          # rustup homes used by this build system
+          echo "RUSTUP_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+
+          # rustc/cargo are typically installed here by rustup
+          if [ -d "$PWD/clang_root/install_rustup/.cargo/bin" ]; then
+            echo "$PWD/clang_root/install_rustup/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Ensure Rust toolchain exists
+        run: |
+          set -euxo pipefail
+
+          echo "=== find rust binaries under clang_root ==="
+          find "$PWD/clang_root/install_rustup" -maxdepth 6 -type f \( -name rustup -o -name rustc -o -name cargo \) -print || true
+
+          # If rustup exists but rustc/cargo do not, install stable.
+          if command -v rustup >/dev/null 2>&1; then
+            if ! command -v rustc >/dev/null 2>&1; then
+              rustup toolchain install stable
+              rustup default stable
+            fi
+          fi
+
+          command -v rustup || true
+          command -v rustc || true
+          command -v cargo || true
+          rustup --version || true
+          rustc --version || true
+          cargo --version || true
 
       - name: Toolchain versions (sanity check)
         run: |
           set -euxo pipefail
-
           echo "=== PATH ==="
           echo "$PATH"
 
@@ -107,15 +138,9 @@ jobs:
           which x86_64-w64-mingw32-clang || true
           x86_64-w64-mingw32-clang --version || true
 
-          echo "=== gcc (leak check) ==="
-          which x86_64-w64-mingw32-gcc || true
-          x86_64-w64-mingw32-gcc --version || true
-
-          echo "=== rustc ==="
+          echo "=== rustc/cargo ==="
           which rustc || true
           rustc --version || true
-
-          echo "=== cargo ==="
           which cargo || true
           cargo --version || true
 
@@ -123,37 +148,6 @@ jobs:
         if: ${{ github.event.inputs.command != '' }}
         continue-on-error: true
         run: ${{ github.event.inputs.command }}
-
-      - name: Force toolchain PATH (clang_root + rust)
-        run: |
-          set -euxo pipefail
-
-          # clang/lld
-          echo "$PWD/clang_root/bin" >> "$GITHUB_PATH"
-
-          # rustup installs rustc/cargo into a .cargo/bin directory (not .../bin)
-          if [ -d "$PWD/clang_root/install_rustup/.cargo/bin" ]; then
-            echo "$PWD/clang_root/install_rustup/.cargo/bin" >> "$GITHUB_PATH"
-          fi
-
-          # some layouts may still have bin/
-          if [ -d "$PWD/clang_root/install_rustup/bin" ]; then
-            echo "$PWD/clang_root/install_rustup/bin" >> "$GITHUB_PATH"
-          fi
-
-      - name: Verify Rust exists (and show location)
-        run: |
-          set -euxo pipefail
-          echo "=== rust locations under clang_root ==="
-          find "$PWD/clang_root/install_rustup" -maxdepth 4 -type f \( -name rustc -o -name cargo -o -name rustup \) -print || true
-
-          command -v rustup || true
-          command -v rustc || true
-          command -v cargo || true
-
-          rustup --version || true
-          rustc --version || true
-          cargo --version || true
 
       - name: Configure CMake & download sources
         run: |
@@ -188,6 +182,19 @@ jobs:
           else
             ninja -C build_${{ env.BIT }} mpv
             echo "mpv_ver=UNKNOWN" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Dump mpv build log on failure
+        if: failure()
+        run: |
+          set +e
+          echo "=== mpv stamp dir ==="
+          ls -la build_${BIT}/packages/mpv-prefix/src/mpv-stamp/ || true
+          log=$(ls -1 build_${BIT}/packages/mpv-prefix/src/mpv-stamp/mpv-build-*.log 2>/dev/null | tail -n 1)
+          echo "Using log: $log"
+          if [ -n "$log" ]; then
+            echo "=== last 200 lines of mpv-build log ==="
+            tail -n 200 "$log"
           fi
 
       - name: Package mpv
