@@ -11,16 +11,6 @@ on:
         description: "Run custom command before building"
         required: false
         type: string
-      sourceforge:
-        description: "Upload to Sourceforge"
-        required: false
-        default: false
-        type: boolean
-      github_release:
-        description: "Upload to GitHub release (this repo)"
-        required: false
-        default: false
-        type: boolean
       mpv_tarball:
         description: "Build latest mpv tarball"
         required: false
@@ -49,7 +39,7 @@ jobs:
           git config --global pull.rebase true
           git config --global rebase.autoStash true
           git config --global fetch.prune true
-          git config --global --add safe.directory /__w/*
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
       - uses: actions/checkout@v4
         with:
@@ -58,6 +48,7 @@ jobs:
       - name: Compute cache suffix
         id: cache_suffix
         run: |
+          set -euxo pipefail
           echo "suffix=${{ github.ref_name }}-${{ hashFiles('CMakeLists.txt','cmake/**','packages/**','toolchain/**','.github/workflows/**') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore clang_root cache
@@ -162,9 +153,9 @@ jobs:
           path: logs.7z
           retention-days: 1
 
-      - name: Upload mpv artifact
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: mpv-x86_64
           path: release_${{ env.BIT }}/*.7z
-          retention
+          retention-days: 1
