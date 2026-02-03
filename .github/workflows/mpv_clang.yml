@@ -124,6 +124,37 @@ jobs:
         continue-on-error: true
         run: ${{ github.event.inputs.command }}
 
+      - name: Force toolchain PATH (clang_root + rust)
+        run: |
+          set -euxo pipefail
+
+          # clang/lld
+          echo "$PWD/clang_root/bin" >> "$GITHUB_PATH"
+
+          # rustup installs rustc/cargo into a .cargo/bin directory (not .../bin)
+          if [ -d "$PWD/clang_root/install_rustup/.cargo/bin" ]; then
+            echo "$PWD/clang_root/install_rustup/.cargo/bin" >> "$GITHUB_PATH"
+          fi
+
+          # some layouts may still have bin/
+          if [ -d "$PWD/clang_root/install_rustup/bin" ]; then
+            echo "$PWD/clang_root/install_rustup/bin" >> "$GITHUB_PATH"
+          fi
+
+      - name: Verify Rust exists (and show location)
+        run: |
+          set -euxo pipefail
+          echo "=== rust locations under clang_root ==="
+          find "$PWD/clang_root/install_rustup" -maxdepth 4 -type f \( -name rustc -o -name cargo -o -name rustup \) -print || true
+
+          command -v rustup || true
+          command -v rustc || true
+          command -v cargo || true
+
+          rustup --version || true
+          rustc --version || true
+          cargo --version || true
+
       - name: Configure CMake & download sources
         run: |
           set -euxo pipefail
