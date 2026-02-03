@@ -19,7 +19,39 @@ on:
 
 jobs:
   build_mpv:
-    name: Build mpv (clang, x86_64)
+    - name: Toolchain versions (sanity check)
+      run: |
+        set -euxo pipefail
+
+        echo "=== PATH ==="
+        echo "$PATH"
+
+        echo "=== clang ==="
+        which clang || true
+        clang --version || true
+
+        echo "=== lld ==="
+        which ld.lld || true
+        ld.lld --version || true
+
+        echo "=== mingw clang ==="
+        which x86_64-w64-mingw32-clang || true
+        x86_64-w64-mingw32-clang --version || true
+
+        echo "=== gcc (leak check) ==="
+        which x86_64-w64-mingw32-gcc || true
+        x86_64-w64-mingw32-gcc --version || true
+
+        echo "=== rustc ==="
+        which rustc || true
+        rustc --version || true
+
+        echo "=== cargo ==="
+        which cargo || true
+        cargo --version || true
+
+  
+    - name: Build mpv (clang, x86_64)
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/shinchiro/archlinux:latest
