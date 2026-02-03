@@ -11,10 +11,40 @@ on:
         description: "Run custom command before building"
         required: false
         type: string
+
       mpv_tarball:
         description: "Build latest mpv tarball"
         required: false
         default: false
+        type: boolean
+
+      enable_lto:
+        description: "Enable LTO (slower link, smaller/faster binaries)"
+        required: false
+        default: true
+        type: boolean
+
+      enable_pdb:
+        description: "Enable PDB (Windows debug symbols; can slow builds)"
+        required: false
+        default: true
+        type: boolean
+
+      package_kind:
+        description: "Which packages to keep/upload: dev | release | debug | all"
+        required: false
+        default: all
+        type: choice
+        options:
+          - all
+          - dev
+          - release
+          - debug
+
+      upload_logs:
+        description: "Upload build logs artifact"
+        required: false
+        default: true
         type: boolean
 
 jobs:
@@ -26,6 +56,10 @@ jobs:
     env:
       BIT: x86_64
       arch: x86_64
+
+      # these are used by the build wrapper (build_x86_64/exec) in this project
+      LTO_JOB: ${{ github.event.inputs.enable_lto && '1' || '0' }}
+      PDB: ${{ github.event.inputs.enable_pdb && '1' || '0' }}
 
     outputs:
       mpv_ver: ${{ steps.build_mpv_step.outputs.mpv_ver }}
@@ -53,7 +87,6 @@ jobs:
           echo "suffix=${{ github.ref_name }}-${{ hashFiles('CMakeLists.txt','cmake/**','packages/**','toolchain/**','.github/workflows/**') }}" >> "$GITHUB_OUTPUT"
 
       - name: Restore clang_root cache
-        id: clang_root_cache
         uses: actions/cache/restore@v4
         with:
           path: clang_root
@@ -63,7 +96,6 @@ jobs:
             ${{ secrets.CACHE_VERSION }}-clang_root-
 
       - name: Restore repository cache
-        id: repository_cache
         uses: actions/cache/restore@v4
         with:
           path: src_packages
@@ -73,7 +105,6 @@ jobs:
             ${{ secrets.CACHE_VERSION }}-repository-
 
       - name: Restore x86_64 toolchain cache
-        id: x86_64_cache
         uses: actions/cache/restore@v4
         with:
           path: build_x86_64
@@ -85,15 +116,9 @@ jobs:
       - name: Force toolchain PATH (clang_root + rust)
         run: |
           set -euxo pipefail
-
-          # clang/lld from the toolchain
           echo "$PWD/clang_root/bin" >> "$GITHUB_PATH"
-
-          # rustup homes used by this build system
           echo "RUSTUP_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
           echo "CARGO_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
-
-          # rustc/cargo are typically installed here by rustup
           if [ -d "$PWD/clang_root/install_rustup/.cargo/bin" ]; then
             echo "$PWD/clang_root/install_rustup/.cargo/bin" >> "$GITHUB_PATH"
           fi
@@ -101,22 +126,12 @@ jobs:
       - name: Ensure Rust toolchain exists
         run: |
           set -euxo pipefail
-
-          echo "=== find rust binaries under clang_root ==="
-          find "$PWD/clang_root/install_rustup" -maxdepth 6 -type f \( -name rustup -o -name rustc -o -name cargo \) -print || true
-
-          # If rustup exists but rustc/cargo do not, install stable.
           if command -v rustup >/dev/null 2>&1; then
             if ! command -v rustc >/dev/null 2>&1; then
               rustup toolchain install stable
               rustup default stable
             fi
           fi
-
-          command -v rustup || true
-          command -v rustc || true
-          command -v cargo || true
-          rustup --version || true
           rustc --version || true
           cargo --version || true
 
@@ -125,24 +140,16 @@ jobs:
           set -euxo pipefail
           echo "=== PATH ==="
           echo "$PATH"
-
-          echo "=== clang ==="
-          which clang || true
+          echo "=== clang/lld ==="
           clang --version || true
-
-          echo "=== lld ==="
-          which ld.lld || true
           ld.lld --version || true
-
-          echo "=== mingw clang ==="
-          which x86_64-w64-mingw32-clang || true
-          x86_64-w64-mingw32-clang --version || true
-
-          echo "=== rustc/cargo ==="
-          which rustc || true
+          echo "=== rust ==="
           rustc --version || true
-          which cargo || true
           cargo --version || true
+          echo "=== toggles ==="
+          echo "enable_lto=${{ github.event.inputs.enable_lto }} -> LTO_JOB=$LTO_JOB"
+          echo "enable_pdb=${{ github.event.inputs.enable_pdb }} -> PDB=$PDB"
+          echo "package_kind=${{ github.event.inputs.package_kind }}"
 
       - name: Running custom command
         if: ${{ github.event.inputs.command != '' }}
@@ -160,7 +167,7 @@ jobs:
             -DSINGLE_SOURCE_LOCATION="$PWD/src_packages" \
             -DRUSTUP_LOCATION="$PWD/clang_root/install_rustup" \
             -DENABLE_CCACHE=ON \
-            -DCLANG_PACKAGES_LTO=ON \
+            -DCLANG_PACKAGES_LTO=${{ github.event.inputs.enable_lto && 'ON' || 'OFF' }} \
             -G Ninja \
             --fresh \
             -B build_${{ env.BIT }} \
@@ -188,14 +195,9 @@ jobs:
         if: failure()
         run: |
           set +e
-          echo "=== mpv stamp dir ==="
-          ls -la build_${BIT}/packages/mpv-prefix/src/mpv-stamp/ || true
           log=$(ls -1 build_${BIT}/packages/mpv-prefix/src/mpv-stamp/mpv-build-*.log 2>/dev/null | tail -n 1)
           echo "Using log: $log"
-          if [ -n "$log" ]; then
-            echo "=== last 200 lines of mpv-build log ==="
-            tail -n 200 "$log"
-          fi
+          if [ -n "$log" ]; then tail -n 200 "$log"; fi
 
       - name: Package mpv
         run: |
@@ -212,8 +214,26 @@ jobs:
             release_${{ env.BIT }}/ffmpeg-${{ env.arch }}-git-$hash.7z \
             ./build_${{ env.BIT }}/${{ env.BIT }}-w64-mingw32/bin/ffmpeg.exe
 
+      - name: Prune packages (based on package_kind)
+        run: |
+          set -euxo pipefail
+          cd "release_${{ env.BIT }}"
+          kind="${{ github.event.inputs.package_kind }}"
+
+          # Always keep ffmpeg archive
+          # mpv packages start with mpv-
+          if [[ "$kind" == "all" ]]; then
+            exit 0
+          elif [[ "$kind" == "dev" ]]; then
+            rm -f mpv-${{ env.arch }}-*.7z mpv-debug-${{ env.arch }}-*.7z || true
+          elif [[ "$kind" == "release" ]]; then
+            rm -f mpv-dev-${{ env.arch }}-*.7z mpv-debug-${{ env.arch }}-*.7z || true
+          elif [[ "$kind" == "debug" ]]; then
+            rm -f mpv-${{ env.arch }}-*.7z mpv-dev-${{ env.arch }}-*.7z || true
+          fi
+
       - name: Collect logs
-        if: always()
+        if: ${{ always() && github.event.inputs.upload_logs == true }}
         run: |
           set -euxo pipefail
           mkdir -p build_${{ env.BIT }}_logs
@@ -221,7 +241,7 @@ jobs:
           7z a -m0=lzma2 -mx=9 -ms=on logs.7z build_${{ env.BIT }}_logs
 
       - name: Upload logs artifact
-        if: always()
+        if: ${{ always() && github.event.inputs.upload_logs == true }}
         uses: actions/upload-artifact@v4
         with:
           name: mpv-x86_64-logs
