@@ -1,4 +1,4 @@
-name: mpv clang
+aname: mpv clang
 
 defaults:
   run:
@@ -66,6 +66,24 @@ jobs:
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang_root
 
+      # ✅ NEW (1/2): put clang_root + rust on PATH the correct way (right after clang_root restore)
+      - name: Prepend toolchain PATH (clang_root + rust)
+        run: |
+          set -euxo pipefail
+          echo "$PWD/clang_root/bin" >> "$GITHUB_PATH"
+          echo "$PWD/clang_root/install_rustup/.cargo/bin" >> "$GITHUB_PATH"
+          echo "RUSTUP_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+
+      # ✅ NEW (2/2): fail fast if clang_root cache is broken (prevents brotli/others failing later)
+      - name: Validate clang_root toolchain
+        run: |
+          set -euxo pipefail
+          ls -la clang_root/bin | head
+          test -x "$PWD/clang_root/bin/clang"
+          test -x "$PWD/clang_root/bin/ld.lld" || true
+          "$PWD/clang_root/bin/clang" --version
+
       - name: Loading repository cache
         uses: actions/cache/restore@main
         with:
@@ -98,16 +116,10 @@ jobs:
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain
 
-      # ✅ Make sure we actually use clang_root + cached rustup
-      - name: Prepend toolchain PATH (clang_root + rust)
-        run: |
-          echo "PATH=$PWD/clang_root/bin:$PWD/clang_root/install_rustup/.cargo/bin:$PATH" >> "$GITHUB_ENV"
-          echo "RUSTUP_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
-          echo "CARGO_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
-
       - name: Toolchain sanity check
         run: |
           set -euxo pipefail
+          echo "PATH=$PATH"
           which clang || true
           which ld.lld || true
           clang --version || true
