@@ -1,4 +1,5 @@
 name: mpv clang
+
 defaults:
   run:
     shell: bash
@@ -26,6 +27,7 @@ jobs:
       image: docker://ghcr.io/shinchiro/archlinux:latest
     outputs:
       mpv_ver: ${{ steps.build_mpv_step.outputs.mpv_ver }}
+
     steps:
       - name: Init variable
         run: |
@@ -57,8 +59,7 @@ jobs:
       - name: Loading clang sysroot cache
         uses: actions/cache/restore@main
         with:
-          path: |
-            clang_root
+          path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang_root
@@ -74,11 +75,27 @@ jobs:
       - name: Loading ${{ matrix.bit }} toolchain cache
         uses: actions/cache/restore@main
         with:
-          path: |
-            build_${{ matrix.bit }}
+          path: build_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain
+
+      # ✅ NEW: make sure we actually use clang_root + cached rustup
+      - name: Prepend toolchain PATH (clang_root + rust)
+        run: |
+          echo "PATH=$PWD/clang_root/bin:$PWD/clang_root/install_rustup/.cargo/bin:$PATH" >> "$GITHUB_ENV"
+          echo "RUSTUP_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+          echo "CARGO_HOME=$PWD/clang_root/install_rustup" >> "$GITHUB_ENV"
+
+      - name: Toolchain sanity check
+        run: |
+          set -euxo pipefail
+          which clang
+          which ld.lld
+          clang --version
+          ld.lld --version
+          rustc -Vv || true
+          cargo -V || true
 
       - name: Running custom command
         if: ${{ github.event.inputs.command != '' }}
@@ -87,54 +104,78 @@ jobs:
 
       - name: Configuring CMake & Downloading source
         run: |
-          cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} -DCMAKE_INSTALL_PREFIX=$PWD/clang_root -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 -DSINGLE_SOURCE_LOCATION=$PWD/src_packages -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup -DENABLE_CCACHE=ON -DCLANG_PACKAGES_LTO=ON -G Ninja --fresh -B build_$BIT -S $PWD
+          cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} \
+            -DCMAKE_INSTALL_PREFIX=$PWD/clang_root \
+            -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 \
+            -DSINGLE_SOURCE_LOCATION=$PWD/src_packages \
+            -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup \
+            -DENABLE_CCACHE=ON \
+            -DCLANG_PACKAGES_LTO=ON \
+            -G Ninja --fresh -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
 
       - name: Building mpv
         id: build_mpv_step
-        env:
-          MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
         run: |
+          set -euxo pipefail
           ninja -C build_$BIT update
-          $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
-          $MPV_TARBALL && echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT || echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
+          ninja -C build_$BIT mpv
+          echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
 
-      - name: Packaging mpv
+      - name: Packaging mpv (include dev + debug + release)
         run: |
+          set -euxo pipefail
           mkdir -p release_$BIT
-          ninja -C build_$BIT mpv-packaging; mv build_$BIT/mpv*.7z release_$BIT
+          ninja -C build_$BIT mpv-packaging
+          mv build_$BIT/mpv*.7z release_$BIT
+
+      # ✅ NEW: verify libmpv-2.dll exists in sysroot (helps debugging)
+      - name: Verify libmpv exists
+        if: always()
+        run: |
+          set -euxo pipefail
+          ls -la build_$BIT/$BIT-w64-mingw32/bin | grep -i mpv || true
+          test -f build_$BIT/$BIT-w64-mingw32/bin/libmpv-2.dll && echo "OK: libmpv-2.dll exists" || echo "WARN: libmpv-2.dll missing"
 
       - name: Copying ffmpeg
         run: |
           hash=$(git -C src_packages/ffmpeg rev-parse --short HEAD)
-          7z a -m0=lzma2 -mx=9 -ms=on release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
+          7z a -m0=lzma2 -mx=9 -ms=on \
+            release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
+            ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
+      # ✅ Improved log collection: grab all *.log + meson/cmake logs
       - name: Collecting logs
         if: always()
         run: |
+          set -euxo pipefail
           mkdir -p build_${BIT}_logs
-          cp -fr $(find build_$BIT -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log") build_${BIT}_logs || true
-          7z a -m0=lzma2 -mx=9 -ms=on logs.7z build*logs
+
+          find build_$BIT -type f \( \
+              -iname "*.log" -o -iname "*.txt" -o \
+              -name "config.log" -o \
+              -name "meson-log.txt" -o \
+              -name "CMakeOutput.log" -o -name "CMakeError.log" \
+            \) -print0 2>/dev/null | xargs -0 -I{} cp -f --parents "{}" build_${BIT}_logs/ || true
+
+          tar -czf logs.tgz build_${BIT}_logs
 
       - name: Uploading logs
         uses: actions/upload-artifact@master
         if: always()
         with:
           name: mpv-${{ matrix.bit }}-logs
-          path: logs.7z
+          path: logs.tgz
           retention-days: 1
 
-      - name: Uploading ${{ matrix.bit }} build
+      # ✅ Upload ALL mpv packages, including mpv-dev (has libmpv-2.dll)
+      - name: Uploading ${{ matrix.bit }} packages
         uses: actions/upload-artifact@master
+        if: always()
         with:
-          name: mpv-${{ matrix.bit }}
-          path: release_${{ matrix.bit }}/mpv-${{ env.arch }}*
-
-      - name: Uploading ${{ matrix.bit }} debug
-        uses: actions/upload-artifact@master
-        with:
-          name: mpv-${{ matrix.bit }}-debug
-          path: release_${{ matrix.bit }}/mpv-debug-${{ env.arch }}*
+          name: mpv-${{ matrix.bit }}-packages
+          path: release_${{ matrix.bit }}/*.7z
+          retention-days: 1
 
       - name: Cleaning build directory
         if: always()
@@ -151,8 +192,7 @@ jobs:
         uses: actions/cache/save@main
         if: ${{ always() && matrix.bit == 'x86_64' }}
         with:
-          path: |
-            clang_root
+          path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
 
       - name: Saving repository cache
@@ -166,13 +206,12 @@ jobs:
         uses: actions/cache/save@main
         if: always()
         with:
-          path: |
-            build_${{ matrix.bit }}
+          path: build_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
 
       - name: Saving release_${{ matrix.bit }} cache
         uses: actions/cache/save@main
+        if: always()
         with:
           path: release_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
-
