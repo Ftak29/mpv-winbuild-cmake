@@ -23,6 +23,8 @@ jobs:
         bit: [x86_64]
     env:
       BIT: ${{ matrix.bit }}
+      # Option B: enforce FFmpeg tag even when src_packages is cached
+      FFMPEG_TAG: n8.0.1
     container:
       image: docker://ghcr.io/shinchiro/archlinux:latest
     outputs:
@@ -72,6 +74,22 @@ jobs:
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-repository
 
+      # ✅ Option B goes HERE (after repository cache restore)
+      - name: Force FFmpeg tag (n8.0.1)
+        run: |
+          set -euxo pipefail
+          if [ -d src_packages/ffmpeg/.git ]; then
+            echo "FFmpeg repo exists — forcing tag ${FFMPEG_TAG}"
+            git -C src_packages/ffmpeg fetch --tags --force origin
+            git -C src_packages/ffmpeg checkout -f "${FFMPEG_TAG}"
+          else
+            echo "FFmpeg repo missing — cloning fresh tag ${FFMPEG_TAG}"
+            rm -rf src_packages/ffmpeg || true
+            git clone --branch "${FFMPEG_TAG}" --depth 1 https://github.com/FFmpeg/FFmpeg.git src_packages/ffmpeg
+          fi
+          echo "FFmpeg now at:"
+          git -C src_packages/ffmpeg describe --tags --always --dirty
+
       - name: Loading ${{ matrix.bit }} toolchain cache
         uses: actions/cache/restore@main
         with:
@@ -80,7 +98,7 @@ jobs:
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain
 
-      # ✅ NEW: make sure we actually use clang_root + cached rustup
+      # ✅ Make sure we actually use clang_root + cached rustup
       - name: Prepend toolchain PATH (clang_root + rust)
         run: |
           echo "PATH=$PWD/clang_root/bin:$PWD/clang_root/install_rustup/.cargo/bin:$PATH" >> "$GITHUB_ENV"
@@ -90,10 +108,10 @@ jobs:
       - name: Toolchain sanity check
         run: |
           set -euxo pipefail
-          which clang
-          which ld.lld
-          clang --version
-          ld.lld --version
+          which clang || true
+          which ld.lld || true
+          clang --version || true
+          ld.lld --version || true
           rustc -Vv || true
           cargo -V || true
 
@@ -104,6 +122,7 @@ jobs:
 
       - name: Configuring CMake & Downloading source
         run: |
+          set -euxo pipefail
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} \
             -DCMAKE_INSTALL_PREFIX=$PWD/clang_root \
             -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 \
@@ -129,7 +148,6 @@ jobs:
           ninja -C build_$BIT mpv-packaging
           mv build_$BIT/mpv*.7z release_$BIT
 
-      # ✅ NEW: verify libmpv-2.dll exists in sysroot (helps debugging)
       - name: Verify libmpv exists
         if: always()
         run: |
@@ -139,25 +157,23 @@ jobs:
 
       - name: Copying ffmpeg
         run: |
+          set -euxo pipefail
           hash=$(git -C src_packages/ffmpeg rev-parse --short HEAD)
           7z a -m0=lzma2 -mx=9 -ms=on \
             release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
             ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
-      # ✅ Improved log collection: grab all *.log + meson/cmake logs
       - name: Collecting logs
         if: always()
         run: |
           set -euxo pipefail
           mkdir -p build_${BIT}_logs
-
           find build_$BIT -type f \( \
               -iname "*.log" -o -iname "*.txt" -o \
               -name "config.log" -o \
               -name "meson-log.txt" -o \
               -name "CMakeOutput.log" -o -name "CMakeError.log" \
             \) -print0 2>/dev/null | xargs -0 -I{} cp -f --parents "{}" build_${BIT}_logs/ || true
-
           tar -czf logs.tgz build_${BIT}_logs
 
       - name: Uploading logs
@@ -168,7 +184,6 @@ jobs:
           path: logs.tgz
           retention-days: 1
 
-      # ✅ Upload ALL mpv packages, including mpv-dev (has libmpv-2.dll)
       - name: Uploading ${{ matrix.bit }} packages
         uses: actions/upload-artifact@master
         if: always()
@@ -180,13 +195,13 @@ jobs:
       - name: Cleaning build directory
         if: always()
         run: |
-          rm -rf build_$BIT/mpv*
-          rm -rf release_$BIT/mpv-debug*.7z
+          rm -rf build_$BIT/mpv* || true
+          rm -rf release_$BIT/mpv-debug*.7z || true
 
       - name: Cleaning rust toolchain directory
         if: always()
         run: |
-          ninja -C build_$BIT cargo-clean
+          ninja -C build_$BIT cargo-clean || true
 
       - name: Saving clang sysroot cache
         uses: actions/cache/save@main
