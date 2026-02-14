@@ -1,4 +1,5 @@
 name: mpv clang
+
 defaults:
   run:
     shell: bash
@@ -26,6 +27,7 @@ jobs:
       image: docker://ghcr.io/shinchiro/archlinux:latest
     outputs:
       mpv_ver: ${{ steps.build_mpv_step.outputs.mpv_ver }}
+
     steps:
       - name: Init variable
         run: |
@@ -57,8 +59,7 @@ jobs:
       - name: Loading clang sysroot cache
         uses: actions/cache/restore@main
         with:
-          path: |
-            clang_root
+          path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang_root
@@ -74,8 +75,7 @@ jobs:
       - name: Loading ${{ matrix.bit }} toolchain cache
         uses: actions/cache/restore@main
         with:
-          path: |
-            build_${{ matrix.bit }}
+          path: build_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain
@@ -87,7 +87,17 @@ jobs:
 
       - name: Configuring CMake & Downloading source
         run: |
-          cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} -DCMAKE_INSTALL_PREFIX=$PWD/clang_root -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 -DSINGLE_SOURCE_LOCATION=$PWD/src_packages -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup -DENABLE_CCACHE=ON -DCLANG_PACKAGES_LTO=ON -G Ninja --fresh -B build_$BIT -S $PWD
+          cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 \
+                -DCOMPILER_TOOLCHAIN=clang \
+                ${{ env.x86_64_v3_ARCH }} \
+                -DCMAKE_INSTALL_PREFIX=$PWD/clang_root \
+                -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 \
+                -DSINGLE_SOURCE_LOCATION=$PWD/src_packages \
+                -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup \
+                -DENABLE_CCACHE=ON \
+                -DCLANG_PACKAGES_LTO=ON \
+                -G Ninja --fresh \
+                -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
 
       - name: Building mpv
@@ -102,27 +112,15 @@ jobs:
       - name: Packaging mpv
         run: |
           mkdir -p release_$BIT
-          ninja -C build_$BIT mpv-packaging; mv build_$BIT/mpv*.7z release_$BIT
+          ninja -C build_$BIT mpv-packaging
+          mv build_$BIT/mpv*.7z release_$BIT
 
       - name: Copying ffmpeg
         run: |
           hash=$(git -C src_packages/ffmpeg rev-parse --short HEAD)
-          7z a -m0=lzma2 -mx=9 -ms=on release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
-
-      - name: Collecting logs
-        if: always()
-        run: |
-          mkdir -p build_${BIT}_logs
-          cp -fr $(find build_$BIT -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log") build_${BIT}_logs || true
-          7z a -m0=lzma2 -mx=9 -ms=on logs.7z build*logs
-
-      - name: Uploading logs
-        uses: actions/upload-artifact@master
-        if: always()
-        with:
-          name: mpv-${{ matrix.bit }}-logs
-          path: logs.7z
-          retention-days: 1
+          7z a -m0=lzma2 -mx=9 -ms=on \
+             release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
+             ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
       - name: Uploading ${{ matrix.bit }} build
         uses: actions/upload-artifact@master
@@ -136,43 +134,22 @@ jobs:
           name: mpv-${{ matrix.bit }}-debug
           path: release_${{ matrix.bit }}/mpv-debug-${{ env.arch }}*
 
+      # ✅ NEW: Upload dev package
+      - name: Uploading ${{ matrix.bit }} dev
+        uses: actions/upload-artifact@master
+        with:
+          name: mpv-${{ matrix.bit }}-dev
+          path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
+
       - name: Cleaning build directory
         if: always()
         run: |
           rm -rf build_$BIT/mpv*
           rm -rf release_$BIT/mpv-debug*.7z
-
-      - name: Cleaning rust toolchain directory
-        if: always()
-        run: |
-          ninja -C build_$BIT cargo-clean
-
-      - name: Saving clang sysroot cache
-        uses: actions/cache/save@main
-        if: ${{ always() && matrix.bit == 'x86_64' }}
-        with:
-          path: |
-            clang_root
-          key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
-
-      - name: Saving repository cache
-        uses: actions/cache/save@main
-        if: ${{ always() && matrix.bit == 'x86_64' }}
-        with:
-          path: src_packages
-          key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
-
-      - name: Saving ${{ matrix.bit }} toolchain cache
-        uses: actions/cache/save@main
-        if: always()
-        with:
-          path: |
-            build_${{ matrix.bit }}
-          key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
+          rm -rf release_$BIT/mpv-dev*.7z
 
       - name: Saving release_${{ matrix.bit }} cache
         uses: actions/cache/save@main
         with:
           path: release_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
-
