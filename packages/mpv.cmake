@@ -108,12 +108,6 @@ ExternalProject_Add_Step(mpv copy-package-dir
     COMMAND mv ${CMAKE_CURRENT_BINARY_DIR}/mpv-package ${CMAKE_BINARY_DIR}/mpv-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}
     COMMAND ${RENAME} <SOURCE_DIR> ${CMAKE_BINARY_DIR}/mpv-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}
 
-    # only move mpv-debug if it exists (otherwise step aborts)
-    COMMAND bash -lc "if [ -d '${CMAKE_CURRENT_BINARY_DIR}/mpv-debug' ]; then \
-        mv '${CMAKE_CURRENT_BINARY_DIR}/mpv-debug' '${CMAKE_BINARY_DIR}/mpv-debug-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}'; \
-        ${RENAME} <SOURCE_DIR> '${CMAKE_BINARY_DIR}/mpv-debug-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}'; \
-    fi"
-
     COMMAND mv ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev ${CMAKE_BINARY_DIR}/mpv-dev-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}
     COMMAND ${RENAME} <SOURCE_DIR> ${CMAKE_BINARY_DIR}/mpv-dev-${TARGET_CPU}${x86_64_LEVEL}-${BUILDDATE}
 
