@@ -115,6 +115,5 @@ ExternalProject_Add_Step(mpv copy-package-dir
     LOG 1
 )
 
-force_rebuild_git(mpv)
 force_meson_configure(mpv)
 cleanup(mpv copy-package-dir)
