@@ -1,18 +1,16 @@
 function(cleanup _name _last_step)
     get_property(_build_in_source TARGET ${_name} PROPERTY _EP_BUILD_IN_SOURCE)
-    get_property(_git_repository TARGET ${_name} PROPERTY _EP_GIT_REPOSITORY)
-    get_property(_url TARGET ${_name} PROPERTY _EP_URL)
-    get_property(git_tag TARGET ${_name} PROPERTY _EP_GIT_TAG)
+    get_property(_git_repository  TARGET ${_name} PROPERTY _EP_GIT_REPOSITORY)
+    get_property(_url            TARGET ${_name} PROPERTY _EP_URL)
+    get_property(git_tag         TARGET ${_name} PROPERTY _EP_GIT_TAG)
     get_property(git_remote_name TARGET ${_name} PROPERTY _EP_GIT_REMOTE_NAME)
-    get_property(stamp_dir TARGET ${_name} PROPERTY _EP_STAMP_DIR)
-    get_property(source_dir TARGET ${_name} PROPERTY _EP_SOURCE_DIR)
+    get_property(stamp_dir       TARGET ${_name} PROPERTY _EP_STAMP_DIR)
+    get_property(source_dir      TARGET ${_name} PROPERTY _EP_SOURCE_DIR)
 
-    if("${git_remote_name}" STREQUAL "" AND NOT "${git_tag}" STREQUAL "")
-        # GIT_REMOTE_NAME is not set when commit hash is specified
-        set(git_tag "")
-    else()
-        set(git_tag "@{u}")
-    endif()
+    # NOTE:
+    # cleanup() must NEVER change what commit is checked out.
+    # It should only clean build artifacts and optionally discard local modifications.
+    # So we do NOT use @{u} here.
 
     if(_git_repository)
         if(_build_in_source)
@@ -20,14 +18,21 @@ function(cleanup _name _last_step)
         else()
             set(remove_cmd "find <BINARY_DIR> -mindepth 1 -delete && git -C <SOURCE_DIR> clean -df")
         endif()
-        set(COMMAND_FORCE_UPDATE COMMAND bash -c "git -C <SOURCE_DIR> am --abort 2> /dev/null || true"
-                                 COMMAND ${stamp_dir}/reset_head.sh
-                                 COMMAND bash -c "git -C <SOURCE_DIR> restore .")
+
+        # Safe "force update" that does NOT move HEAD:
+        # - abort any in-progress 'git am'
+        # - if reset_head.sh exists (from force_rebuild_git), run it; otherwise skip
+        # - restore working tree files (does not change commit)
+        set(COMMAND_FORCE_UPDATE
+            COMMAND bash -c "git -C <SOURCE_DIR> am --abort 2> /dev/null || true"
+            COMMAND bash -c "test -f '${stamp_dir}/reset_head.sh' && '${stamp_dir}/reset_head.sh' || true"
+            COMMAND bash -c "git -C <SOURCE_DIR> restore . 2> /dev/null || true"
+        )
     endif()
 
-    # <STAMP_DIR> doesn't resolve into full path, so <LOG_DIR> is used instead since its same folder.
+    # <STAMP_DIR> doesn't resolve into full path, so <LOG_DIR> is used instead since it's same folder.
     ExternalProject_Add_Step(${_name} fullclean
-        COMMAND ${EXEC} find <LOG_DIR> -type f " ! -iname '*.cmake' " -size 0c -delete # remove 0 byte files which are stamp files
+        COMMAND ${EXEC} find <LOG_DIR> -type f " ! -iname '*.cmake' " -size 0c -delete
         ${COMMAND_FORCE_UPDATE}
         ALWAYS TRUE
         EXCLUDE_FROM_MAIN TRUE
@@ -73,6 +78,7 @@ function(cleanup _name _last_step)
         LOG 1
         COMMENT "Deleting everything about ${_name} package"
     )
+
     ExternalProject_Add_StepTargets(${_name} fullclean liteclean removeprefix removebuild)
 endfunction()
 
