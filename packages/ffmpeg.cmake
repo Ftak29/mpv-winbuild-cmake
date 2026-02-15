@@ -47,7 +47,6 @@ ExternalProject_Add(ffmpeg
         libva
         openal-soft
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
-    GIT_TAG n8.0.1
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !tests/ref/fate"
@@ -87,7 +86,7 @@ ExternalProject_Add(ffmpeg
         --enable-libx264
         --enable-libx265
         --enable-libaom
-        --disable-libsvtav1
+        --enable-libsvtav1
         --enable-libdav1d
         ${ffmpeg_davs2_cmd}
         ${ffmpeg_uavs3d_cmd}
