@@ -115,5 +115,24 @@ ExternalProject_Add_Step(mpv copy-package-dir
     LOG 1
 )
 
+# Keep Meson reconfigure behavior
 force_meson_configure(mpv)
+
+# Provide mpv-force-update target (required by your global "update" step),
+# but pin mpv to the requested tag instead of resetting to @{u}.
+ExternalProject_Add_Step(mpv force-update
+    ALWAYS TRUE
+    EXCLUDE_FROM_MAIN TRUE
+    INDEPENDENT TRUE
+    WORKING_DIRECTORY <SOURCE_DIR>
+    COMMAND bash -c "git am --abort 2> /dev/null || true"
+    COMMAND bash -c "git fetch --tags --force --prune --filter=tree:0 --no-recurse-submodules || true"
+    COMMAND bash -c "git checkout -f v0.41.0"
+    COMMAND bash -c "git submodule update --init --recursive || true"
+    LOG 1
+)
+ExternalProject_Add_StepTargets(mpv force-update)
+
+# Keep cleanup (but it must not require reset_head.sh anymore)
 cleanup(mpv copy-package-dir)
+
