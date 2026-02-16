@@ -1,72 +1,51 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
-From: Your Name <you@example.com>
-Date: Sun, 15 Feb 2026 00:00:00 -0600
-Subject: [PATCH] ccaption: clamp out-of-display columns instead of dropping
- characters
-
-Some live IPTV streams emit invalid cursor positioning that pushes the
-cursor column beyond the 32-column EIA-608 display. FFmpeg's decoder
-currently drops characters when this happens ("Data ignored due to
-columns exceeding screen width"), which can cascade into garbled text.
-
-Be more tolerant: when a printable character arrives with an out-of-range
-column, clamp the cursor to the last visible column and write the
-character instead of dropping it.
-
----
- libavcodec/ccaption_dec.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
-
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 0c3c8c6b7a..d4f5a0b7c1 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
-@@ -529,19 +529,46 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
+@@ -343,26 +343,51 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
+     uint8_t col = ctx->cursor_column;
+     char *row = screen->characters[ctx->cursor_row];
+     char *font = screen->fonts[ctx->cursor_row];
      char *color = screen->colors[ctx->cursor_row];
      char *bg = screen->bgs[ctx->cursor_row];
      char *charset = screen->charsets[ctx->cursor_row];
--    if (ctx->cursor_column < SCREEN_COLUMNS) {
-+
-+    if (ctx->cursor_column < SCREEN_COLUMNS) {
-         row[ctx->cursor_column] = ch;
-         font[ctx->cursor_column] = ctx->cursor_font;
-         color[ctx->cursor_column] = ctx->cursor_color;
-         bg[ctx->cursor_column] = ctx->bg_color;
-         charset[ctx->cursor_column] = ctx->cursor_charset;
+
+     if (col < SCREEN_COLUMNS) {
+         row[col] = ch;
+         font[col] = ctx->cursor_font;
+         color[col] = ctx->cursor_color;
+         bg[col] = ctx->bg_color;
+         charset[col] = ctx->cursor_charset;
          ctx->cursor_charset = CCSET_BASIC_AMERICAN;
-         if (ch)
-             ctx->cursor_column++;
--    } else if (ctx->cursor_column == SCREEN_COLUMNS && ch == 0) {
-+        return;
-+    }
-+
-+    /* We have extra space at end only for null character */
-+    if (ctx->cursor_column == SCREEN_COLUMNS && ch == 0) {
-         row[ctx->cursor_column] = ch;
--    } else {
+         if (ch) ctx->cursor_column++;
+         return;
+     }
+     /* We have extra space at end only for null character */
+     else if (col == SCREEN_COLUMNS && ch == 0) {
+         row[col] = ch;
+         return;
+     }
+     else {
 -        av_log(ctx->logctx, AV_LOG_WARNING, "Data ignored due to columns exceeding screen width\n");
 -        return;
++        /*
++         * Some live streams emit invalid cursor positioning that pushes the
++         * column past the 32-column EIA-608 display. Be tolerant: clamp to the
++         * last visible column instead of dropping the character (dropping can
++         * cascade into garbled text).
++         */
++        av_log(ctx->logctx, AV_LOG_WARNING,
++               "Clamping CC column %u to %u (was out of display range)\n",
++               col, SCREEN_COLUMNS - 1);
++
++        col = SCREEN_COLUMNS - 1;
++        ctx->cursor_column = col;
++
++        row[col] = ch;
++        font[col] = ctx->cursor_font;
++        color[col] = ctx->cursor_color;
++        bg[col] = ctx->bg_color;
++        charset[col] = ctx->cursor_charset;
++        ctx->cursor_charset = CCSET_BASIC_AMERICAN;
 +        return;
      }
-+
-+    /*
-+     * Some live streams emit invalid/garbled cursor positioning that pushes the
-+     * column past the 32-column EIA-608 display. Be tolerant: clamp to the last
-+     * visible column instead of dropping the character (which can cause
-+     * cascading gibberish).
-+     */
-+    av_log(ctx->logctx, AV_LOG_WARNING,
-+           "Clamping CC column %u to %u (was out of display range)\n",
-+           ctx->cursor_column, SCREEN_COLUMNS - 1);
-+
-+    ctx->cursor_column = SCREEN_COLUMNS - 1;
-+
-+    row[ctx->cursor_column] = ch;
-+    font[ctx->cursor_column] = ctx->cursor_font;
-+    color[ctx->cursor_column] = ctx->cursor_color;
-+    bg[ctx->cursor_column] = ctx->bg_color;
-+    charset[ctx->cursor_column] = ctx->cursor_charset;
-+    ctx->cursor_charset = CCSET_BASIC_AMERICAN;
  }
---
-2.46.0
