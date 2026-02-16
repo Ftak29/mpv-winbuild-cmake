@@ -52,18 +52,13 @@ ExternalProject_Add(ffmpeg
 
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
     GIT_TAG n8.0.1
-
     SOURCE_DIR ${SOURCE_LOCATION}
-
-    GIT_CLONE_FLAGS "--sparse --filter=tree:0"
-    GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !tests/ref/fate"
-
-    # Keep this for reproducible builds (no auto-update)
     UPDATE_COMMAND ""
 
-    # Apply local patch (file lives next to this ffmpeg.cmake)
-    PATCH_COMMAND git -C <SOURCE_DIR> apply --whitespace=nowarn
-        ${CMAKE_CURRENT_LIST_DIR}/ffmpeg-0001-ccaption-clamp-columns.patch
+    PATCH_COMMAND
+        ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_LIST_DIR}/ffmpeg-ccaption_dec.c
+            <SOURCE_DIR>/libavcodec/ccaption_dec.c
 
     CONFIGURE_COMMAND ${EXEC} CONF=1 <SOURCE_DIR>/configure
         --cross-prefix=${TARGET_ARCH}-
