@@ -8,7 +8,7 @@ diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
      char *color = screen->colors[ctx->cursor_row];
      char *bg = screen->bgs[ctx->cursor_row];
      char *charset = screen->charsets[ctx->cursor_row];
-
+ 
      if (col < SCREEN_COLUMNS) {
          row[col] = ch;
          font[col] = ctx->cursor_font;
