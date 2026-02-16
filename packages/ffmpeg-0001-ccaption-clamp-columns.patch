@@ -1,4 +1,5 @@
-diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
+python3 - <<'PY'
+patch = """diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -343,26 +343,51 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
@@ -25,7 +26,7 @@ diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
          return;
      }
      else {
--        av_log(ctx->logctx, AV_LOG_WARNING, "Data ignored due to columns exceeding screen width\n");
+-        av_log(ctx->logctx, AV_LOG_WARNING, "Data ignored due to columns exceeding screen width\\n");
 -        return;
 +        /*
 +         * Some live streams emit invalid cursor positioning that pushes the
@@ -34,7 +35,7 @@ diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
 +         * cascade into garbled text).
 +         */
 +        av_log(ctx->logctx, AV_LOG_WARNING,
-+               "Clamping CC column %u to %u (was out of display range)\n",
++               "Clamping CC column %u to %u (was out of display range)\\n",
 +               col, SCREEN_COLUMNS - 1);
 +
 +        col = SCREEN_COLUMNS - 1;
@@ -49,3 +50,7 @@ diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
 +        return;
      }
  }
+"""
+# IMPORTANT: preserve the "single space" context line(s) exactly as written above.
+open("packages/ffmpeg-0001-ccaption-clamp-columns.patch", "w", encoding="utf-8", newline="\n").write(patch)
+PY
