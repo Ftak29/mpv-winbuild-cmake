@@ -1,3 +1,6 @@
+# packages/ffmpeg.cmake
+# FFmpeg build (pinned to n8.0.1) + local patch for EIA-608 tolerance
+
 ExternalProject_Add(ffmpeg
     DEPENDS
         amf-headers
@@ -46,12 +49,22 @@ ExternalProject_Add(ffmpeg
         rubberband
         libva
         openal-soft
+
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
     GIT_TAG n8.0.1
+
     SOURCE_DIR ${SOURCE_LOCATION}
+
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !tests/ref/fate"
+
+    # Keep this for reproducible builds (no auto-update)
     UPDATE_COMMAND ""
+
+    # Apply local patch (file lives next to this ffmpeg.cmake)
+    PATCH_COMMAND git -C <SOURCE_DIR> apply --whitespace=nowarn
+        ${CMAKE_CURRENT_LIST_DIR}/ffmpeg-0001-ccaption-clamp-columns.patch
+
     CONFIGURE_COMMAND ${EXEC} CONF=1 <SOURCE_DIR>/configure
         --cross-prefix=${TARGET_ARCH}-
         --prefix=${MINGW_INSTALL_PREFIX}
@@ -116,11 +129,17 @@ ExternalProject_Add(ffmpeg
         --disable-videotoolbox
         --disable-decoder=libaom_av1
         ${ffmpeg_lto}
-        --extra-cflags='-Wno-error=int-conversion'
-        "--extra-libs='${ffmpeg_extra_libs}'" # -lstdc++ / -lc++ needs by libjxl and shaderc
+        --extra-cflags=-Wno-error=int-conversion
+        --extra-libs=${ffmpeg_extra_libs}
+
     BUILD_COMMAND ${MAKE}
     INSTALL_COMMAND ${MAKE} install
-    LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
+
+    LOG_DOWNLOAD 1
+    LOG_UPDATE 1
+    LOG_CONFIGURE 1
+    LOG_BUILD 1
+    LOG_INSTALL 1
 )
 
 force_rebuild_git(ffmpeg)
