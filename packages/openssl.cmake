@@ -4,17 +4,22 @@ ExternalProject_Add(openssl
         zstd
         brotli
     GIT_REPOSITORY https://github.com/openssl/openssl.git
-    GIT_TAG openssl-3.4.1    
+    GIT_TAG openssl-3.4.1
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !test"
     GIT_SUBMODULES ""
     UPDATE_COMMAND ""
-    PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/openssl-*.patch
-    PATCH_COMMAND ${EXEC} git am --abort || true
-        COMMAND ${EXEC} git reset --hard HEAD
-        COMMAND ${EXEC} git clean -fd
-        COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/openssl-*.patch    
+    PATCH_COMMAND
+        ${EXEC} sh -c "git am --abort || true"
+    COMMAND
+        ${EXEC} sh -c "rm -rf .git/rebase-apply .git/rebase-merge"
+    COMMAND
+        ${EXEC} git reset --hard HEAD
+    COMMAND
+        ${EXEC} git clean -fd
+    COMMAND
+        ${EXEC} sh -c "git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/openssl-*.patch"
     CONFIGURE_COMMAND ${EXEC} CONF=1 <SOURCE_DIR>/Configure
         --cross-compile-prefix=${TARGET_ARCH}-
         --prefix=${MINGW_INSTALL_PREFIX}
