@@ -55,7 +55,6 @@ ExternalProject_Add(mpv
         -Duchardet=enabled
         -Drubberband=enabled
         -Dlcms2=enabled
-        -Dopenal=enabled
         -Dspirv-cross=enabled
         -Dvulkan=enabled
         -Dvapoursynth=enabled
