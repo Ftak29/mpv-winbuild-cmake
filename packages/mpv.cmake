@@ -1,3 +1,7 @@
+set(MPV_LOCAL_PATCH
+    ${CMAKE_CURRENT_LIST_DIR}/patches/mpv-0001-local-cc-hook.patch
+)
+
 ExternalProject_Add(mpv
     DEPENDS
         angle-headers
@@ -28,6 +32,7 @@ ExternalProject_Add(mpv
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
+    PATCH_COMMAND git -C <SOURCE_DIR> apply --ignore-space-change --ignore-whitespace ${MPV_LOCAL_PATCH}
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
