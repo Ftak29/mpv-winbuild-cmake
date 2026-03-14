@@ -1,0 +1,15 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Local Build <local@example.com>
+Date: Fri, 14 Mar 2026 12:00:00 +0000
+Subject: [PATCH] placeholder local patch hook
+
+---
+ DOCS/man/options.rst | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/DOCS/man/options.rst b/DOCS/man/options.rst
+index 1111111..2222222 100644
+--- a/DOCS/man/options.rst
++++ b/DOCS/man/options.rst
+@@ -1,3 +1,4 @@
++..
