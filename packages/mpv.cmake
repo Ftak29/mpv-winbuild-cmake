@@ -2,31 +2,29 @@ set(MPV_LOCAL_PATCH
     ${CMAKE_CURRENT_LIST_DIR}/patches/mpv-0001-local-cc-hook.patch
 )
 
-ExternalProject_Add(mpv
-    DEPENDS
-        angle-headers
-        ffmpeg
-        fribidi
-        lcms2
-        libarchive
-        libass
-        libdvdnav
-        libdvdread
-        libiconv
-        libjpeg
-        libpng
-        luajit
-        rubberband
-        uchardet
-        openal-soft
-        mujs
-        vulkan
-        shaderc
-        libplacebo
-        spirv-cross
-        vapoursynth
-        libsdl2
-        subrandr
+DEPENDS
+    angle-headers
+    ffmpeg
+    fribidi
+    lcms2
+    libarchive
+    libass
+    libdvdnav
+    libdvdread
+    libiconv
+    libjpeg
+    libpng
+    luajit
+    rubberband
+    uchardet
+    mujs
+    vulkan
+    shaderc
+    libplacebo
+    spirv-cross
+    vapoursynth
+    libsdl2
+    subrandr
     GIT_REPOSITORY https://github.com/mpv-player/mpv.git
     GIT_TAG v0.41.0
     SOURCE_DIR ${SOURCE_LOCATION}
