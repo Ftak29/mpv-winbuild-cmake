@@ -75,7 +75,6 @@ list(APPEND ep
     vulkan-header
     vulkan
     libsdl2
-    openal-soft
     libopenmpt
     shaderc
     glad
