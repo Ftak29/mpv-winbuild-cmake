@@ -18,7 +18,6 @@ ExternalProject_Add(mpv-release
         luajit
         rubberband
         uchardet
-        openal-soft
         mujs
         vulkan
         shaderc
@@ -53,7 +52,7 @@ ExternalProject_Add(mpv-release
         -Duchardet=enabled
         -Drubberband=enabled
         -Dlcms2=enabled
-        -Dopenal=enabled
+        -Dopenal=disabled
         -Dspirv-cross=enabled
         -Dvulkan=enabled
         -Dvapoursynth=enabled
