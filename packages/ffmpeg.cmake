@@ -45,7 +45,6 @@ ExternalProject_Add(ffmpeg
         ${ffmpeg_davs2}
         rubberband
         libva
-        openal-soft
     GIT_REPOSITORY https://github.com/FFmpeg/FFmpeg.git
     GIT_TAG v8.0.1
     SOURCE_DIR ${SOURCE_LOCATION}
@@ -106,7 +105,6 @@ ExternalProject_Add(ffmpeg
         --enable-libaribcaption
         ${ffmpeg_cuda}
         --enable-amf
-        --enable-openal
         --enable-opengl
         --disable-doc
         --disable-ffplay
