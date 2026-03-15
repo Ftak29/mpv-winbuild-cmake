@@ -85,7 +85,7 @@ ExternalProject_Add(mpv
         -Dvapoursynth=enabled
         -Dsubrandr=enabled
         ${mpv_gl}
-        -Dc_args='-Wno-error=int-conversion'
+        -Dc_args=-Wno-error=int-conversion
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
     LOG_DOWNLOAD 1
