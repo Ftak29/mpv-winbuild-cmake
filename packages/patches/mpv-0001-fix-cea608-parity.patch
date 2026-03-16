@@ -1,14 +1,3 @@
-From 2b7b2e9d6e9f7a6d5c4b3a219876543210abcdef Mon Sep 17 00:00:00 2001
-From: Local Build <local@example.com>
-Date: Sun, 15 Mar 2026 12:00:00 +0000
-Subject: [PATCH] sub: strip CEA-608 parity bit from decoded text
-
----
- sub/dec_sub.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
-diff --git a/sub/dec_sub.c b/sub/dec_sub.c
-index 3f3b7e8..7a1d9c2 100644
 --- a/sub/dec_sub.c
 +++ b/sub/dec_sub.c
 @@ -332,6 +332,24 @@ struct sub_bitmaps *sub_get_bitmaps(struct dec_sub *sub, struct mp_osd_res dim,
@@ -23,13 +12,12 @@ index 3f3b7e8..7a1d9c2 100644
 +    for (char *p = text; *p; p++) {
 +        unsigned char c = (unsigned char)*p;
 +
-+        // CEA-608 uses 7-bit characters with a parity bit in the MSB.
-+        // If the parity bit leaks through the decode path, text can appear
-+        // scrambled (for example repetitive wrong uppercase letters).
++        // remove CEA-608 parity bit
 +        c &= 0x7F;
 +
 +        if ((c < 32 || c == 127) && c != '\n')
 +            c = ' ';
++
 +        *p = (char)c;
 +    }
 +}
@@ -37,7 +25,7 @@ index 3f3b7e8..7a1d9c2 100644
  // The returned string is talloc'ed.
  char *sub_get_text(struct dec_sub *sub, double pts, enum sd_text_type type)
  {
-@@ -344,8 +362,8 @@ char *sub_get_text(struct dec_sub *sub, double pts, enum sd_text_type type)
+@@ -344,8 +362,10 @@ char *sub_get_text(struct dec_sub *sub, double pts, enum sd_text_type type)
      sub->last_vo_pts = pts;
      update_segment(sub);
  
@@ -49,6 +37,4 @@ index 3f3b7e8..7a1d9c2 100644
      mp_mutex_unlock(&sub->lock);
      return text;
  }
--- 
-2.43.0
-
+ 
