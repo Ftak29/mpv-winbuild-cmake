@@ -1,0 +1,14 @@
+--- a/libavcodec/ccaption_dec.c
++++ b/libavcodec/ccaption_dec.c
+@@
+     if (cc_type==0 || cc_type==1) {
+         if (!av_parity(cc_data_pair[2])) {
+             return AVERROR_INVALIDDATA;
+         }
+-        if (!av_parity(cc_data_pair[1])) {
+-            *hi = 0x7F;
+-        }
++        if (!av_parity(cc_data_pair[1])) {
++            return AVERROR_INVALIDDATA;
++        }
+     }
