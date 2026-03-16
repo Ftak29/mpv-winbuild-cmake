@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 6f4d4fca41..480825119c 100644
+index 6f4d4fca41..c060b0846c 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -390,7 +390,8 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
@@ -12,7 +12,7 @@ index 6f4d4fca41..480825119c 100644
          }
      }
  
-@@ -874,7 +875,7 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -874,9 +875,12 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          if (validate_cc_data_pair(bptr + i, &hi))
              continue;
  
@@ -20,4 +20,9 @@ index 6f4d4fca41..480825119c 100644
 +        if (ctx->data_field >= 0 && cc_type != ctx->data_field)
              continue;
  
++        if (cc_type != 0)
++            continue;
++          
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
+         if (ret < 0)
+             return ret;
