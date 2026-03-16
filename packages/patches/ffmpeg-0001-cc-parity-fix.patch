@@ -8,7 +8,7 @@ index 6f4d4fca41..29a969aa9e 100644
          if (!av_parity(cc_data_pair[1])) {
 -            *hi = 0x7F;
 +            //*hi = 0x7F;
-+            *hi = AVERROR_INVALIDDATA;
++            return AVERROR_INVALIDDATA;
          }
      }
  
