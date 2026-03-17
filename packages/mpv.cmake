@@ -1,9 +1,5 @@
 set(SOURCE_LOCATION ${SINGLE_SOURCE_LOCATION}/mpv)
 
-set(MPV_LOCAL_PATCH
-    ${CMAKE_CURRENT_LIST_DIR}/patches/mpv-0001-version.patch
-)
-
 set(mpv_gl -Dgl=enabled)
 
 if(USE_EGL_ANGLE)
@@ -60,7 +56,7 @@ ExternalProject_Add(mpv
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
-    PATCH_COMMAND git -C <SOURCE_DIR> apply --ignore-space-change --ignore-whitespace ${MPV_LOCAL_PATCH}
+    PATCH_COMMAND ${CMAKE_COMMAND} -E echo "No patch"
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
