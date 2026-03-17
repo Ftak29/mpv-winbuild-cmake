@@ -1,0 +1,6 @@
+diff --git a/player/version.c b/player/version.c
+--- a/player/version.c
++++ b/player/version.c
+@@
+-const char *mpv_version = "0.41.0";
++const char *mpv_version = "0.41.0+1.0";
