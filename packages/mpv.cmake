@@ -56,7 +56,7 @@ ExternalProject_Add(mpv
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
-    PATCH_COMMAND /bin/sh -c "VER=$$(cat <SOURCE_DIR>/MPV_VERSION); printf '%s\n' \"EzTvLibW-1.0-$$VER\" > <SOURCE_DIR>/MPV_VERSION"
+    PATCH_COMMAND /bin/sh -c "VER=\$(cat <SOURCE_DIR>/MPV_VERSION); printf '%s\\n' \"EzTvLibWin-1.0-\$VER\" > <SOURCE_DIR>/MPV_VERSION"
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
