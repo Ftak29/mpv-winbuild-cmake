@@ -1,5 +1,5 @@
 set(FFMPEG_LOCAL_PATCH
-    ${CMAKE_CURRENT_LIST_DIR}/patches/ffmpeg-0001-cc-parity-fix.patch
+    ${CMAKE_CURRENT_LIST_DIR}/patches/0001-ffmpeg-cc.patch
 )
 
 ExternalProject_Add(ffmpeg
