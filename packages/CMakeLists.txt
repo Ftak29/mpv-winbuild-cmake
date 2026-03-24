@@ -87,6 +87,7 @@ list(APPEND ep
     libsixel
     ffmpeg
     mpv
+    mpv-release
     mpv-packaging
     curl
     flac
