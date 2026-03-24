@@ -59,7 +59,7 @@ ExternalProject_Add(mpv
     PATCH_COMMAND
       ${CMAKE_COMMAND}
       -DMPV_VERSION_FILE=<SOURCE_DIR>/MPV_VERSION
-      -P ${CMAKE_CURRENT_LIST_DIR}/cmake/patch_mpv_version.cmake    
+      -P ${CMAKE_CURRENT_LIST_DIR}/../cmake/patch_mpv_version.cmake    
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
