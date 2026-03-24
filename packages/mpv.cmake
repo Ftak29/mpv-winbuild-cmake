@@ -57,9 +57,10 @@ ExternalProject_Add(mpv
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
     PATCH_COMMAND
-      ${CMAKE_COMMAND}
-      -DMPV_VERSION_FILE=<SOURCE_DIR>/MPV_VERSION
-      -P ${CMAKE_CURRENT_LIST_DIR}/../cmake/patch_mpv_version.cmake    
+      ${CMAKE_COMMAND} -E env
+        MPV_SOURCE_DIR=<SOURCE_DIR>
+        EZTV_LIB_VER=EzTvLibWin-1.0
+      /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh  
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
