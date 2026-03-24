@@ -1,6 +1,17 @@
-# Pinned mpv release tarball (reproducible)
-set(MPV_TAG "v0.41.0" CACHE STRING "mpv release tag (e.g. v0.41.0)")
-set(MPV_URL "https://github.com/mpv-player/mpv/archive/${MPV_TAG}.tar.gz")
+# Make it fetch latest tarball release since I'm too lazy to manually change it
+set(PREFIX_DIR ${CMAKE_CURRENT_BINARY_DIR}/mpv-release-prefix)
+file(WRITE ${PREFIX_DIR}/get_latest_tag.sh
+"#!/bin/bash
+tag=$(curl -sI https://github.com/mpv-player/mpv/releases/latest | grep 'location: https://github.com/mpv-player/mpv/releases' | sed 's#.*/##g' | tr -d '\r')
+printf 'https://github.com/mpv-player/mpv/archive/%s.tar.gz' $tag")
+
+# Workaround since cmake dont allow you to change file permission easily
+file(COPY ${PREFIX_DIR}/get_latest_tag.sh
+     DESTINATION ${PREFIX_DIR}/src
+     FILE_PERMISSIONS OWNER_EXECUTE OWNER_READ)
+
+execute_process(COMMAND ${PREFIX_DIR}/src/get_latest_tag.sh
+                OUTPUT_VARIABLE LINK)
 
 ExternalProject_Add(mpv-release
     DEPENDS
@@ -26,8 +37,8 @@ ExternalProject_Add(mpv-release
         vapoursynth
         libsdl2
         subrandr
+    URL ${LINK}
 
-    URL ${MPV_URL}
     SOURCE_DIR ${SOURCE_LOCATION}
 
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
@@ -57,11 +68,19 @@ ExternalProject_Add(mpv-release
         -Dvulkan=enabled
         -Dvapoursynth=enabled
         ${mpv_gl}
-        -Dc_args=-Wno-error=int-conversion
+        -Dc_args='-Wno-error=int-conversion'
 
     BUILD_COMMAND ${EXEC} LTO_JOB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
+)
+
+ExternalProject_Add_Step(mpv-release copy-versionfile
+    DEPENDEES download
+    DEPENDERS configure
+    COMMAND bash -c "cp MPV_VERSION <INSTALL_DIR>/MPV_VERSION"
+    WORKING_DIRECTORY <SOURCE_DIR>
+    LOG 1
 )
 
 ExternalProject_Add_Step(mpv-release strip-binary
@@ -82,11 +101,11 @@ ExternalProject_Add_Step(mpv-release copy-binary
 set(RENAME ${CMAKE_CURRENT_BINARY_DIR}/mpv-prefix/src/rename-stable.sh)
 file(WRITE ${RENAME}
 "#!/bin/bash
-set -e
-cd \"$1\"
+cd $1
+
 TAG=$(cat MPV_VERSION)
-mv \"$2\" \"$3/mpv-${TAG}-$4\"
-")
+mv $2 $3/mpv-\${TAG}-$4")
+
 
 ExternalProject_Add_Step(mpv-release copy-package-dir
     DEPENDEES copy-binary
@@ -97,3 +116,4 @@ ExternalProject_Add_Step(mpv-release copy-package-dir
 )
 
 cleanup(mpv-release copy-package-dir)
+
