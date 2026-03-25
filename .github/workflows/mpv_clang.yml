@@ -90,8 +90,8 @@ jobs:
           rm -rf src_packages/mpv
           rm -rf src_packages/mpv-release-src
           rm -rf build_${{ matrix.bit }}
-      
-      - name: Configuring CMake & Downloading source
+
+      - name: Configuring CMake
         run: |
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 \
                 -DCOMPILER_TOOLCHAIN=clang \
@@ -104,7 +104,15 @@ jobs:
                 -DCLANG_PACKAGES_LTO=ON \
                 -G Ninja --fresh \
                 -B build_$BIT -S $PWD
-          ninja -C build_$BIT download || true
+
+      - name: Download sources
+        run: |
+          ninja -C build_$BIT download
+
+      - name: Building mpv-release
+        id: build_mpv_step
+        run: |
+          ninja -C build_$BIT mpv-release
           
       - name: Building mpv
         id: build_mpv_step
