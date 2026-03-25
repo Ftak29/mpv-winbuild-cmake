@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..12a2190899 100644
+index 9b6c766d87..e67a060061 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -391,7 +391,8 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
@@ -12,12 +12,10 @@ index 9b6c766d87..12a2190899 100644
          }
      }
  
-@@ -501,7 +502,8 @@ static int capture_screen(CCaptionSubContext *ctx)
- 
+@@ -502,6 +503,7 @@ static int capture_screen(CCaptionSubContext *ctx)
              x = ASS_DEFAULT_PLAYRESX * (0.1 + 0.0250 * j);
              y = ASS_DEFAULT_PLAYRESY * (0.1 + 0.0533 * i);
--            av_bprintf(&ctx->buffer[bidx], "{\\an7}{\\pos(%d,%d)}", x, y);
-+            //av_bprintf(&ctx->buffer[bidx], "{\\an7}{\\pos(%d,%d)}", x, y);
+             av_bprintf(&ctx->buffer[bidx], "{\\an7}{\\pos(%d,%d)}", x, y);
 +            av_bprintf(&ctx->buffer[bidx], "{\\an2}");
  
              for (; j < SCREEN_COLUMNS; j++) {
@@ -28,8 +26,8 @@ index 9b6c766d87..12a2190899 100644
  
 -        if (cc_type != ctx->data_field)
 -            continue;
-+        if (cc_type != ctx->data_field)
-+            continue;
++        //if (cc_type != ctx->data_field)
++        //    continue;
 +
 +        /*
 +         * Auto mode:
@@ -43,7 +41,7 @@ index 9b6c766d87..12a2190899 100644
 +        } else {
 +            if (cc_type != 0)
 +                continue;
-+        }  
++        }
  
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
