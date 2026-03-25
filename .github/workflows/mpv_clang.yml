@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: 'Run custom command before building'
+        description: "Run custom command before building"
         required: false
         type: string
 
@@ -21,10 +21,13 @@ jobs:
       fail-fast: false
       matrix:
         bit: [x86_64]
+
     env:
       BIT: ${{ matrix.bit }}
+
     container:
       image: docker://ghcr.io/shinchiro/archlinux:latest
+
     outputs:
       mpv_ver: ${{ steps.build_mpv_step.outputs.mpv_ver }}
 
@@ -32,15 +35,15 @@ jobs:
       - name: Init variable
         run: |
           if [[ $BIT == "i686" ]]; then
-            echo "arch=i686" >> $GITHUB_ENV
+            echo "arch=i686" >> "$GITHUB_ENV"
           elif [[ $BIT == "x86_64" ]]; then
-            echo "arch=x86_64" >> $GITHUB_ENV
+            echo "arch=x86_64" >> "$GITHUB_ENV"
           elif [[ $BIT == "x86_64_v3" ]]; then
-            echo "arch=x86_64" >> $GITHUB_ENV
-            echo "x86_64_level=-v3" >> $GITHUB_ENV
-            echo "x86_64_v3_ARCH=-DGCC_ARCH=x86-64-v3" >> $GITHUB_ENV
+            echo "arch=x86_64" >> "$GITHUB_ENV"
+            echo "x86_64_level=-v3" >> "$GITHUB_ENV"
+            echo "x86_64_v3_ARCH=-DGCC_ARCH=x86-64-v3" >> "$GITHUB_ENV"
           elif [[ $BIT == "aarch64" ]]; then
-            echo "arch=aarch64" >> $GITHUB_ENV
+            echo "arch=aarch64" >> "$GITHUB_ENV"
           fi
 
       - name: Setup git config
@@ -50,7 +53,7 @@ jobs:
           git config --global pull.rebase true
           git config --global rebase.autoStash true
           git config --global fetch.prune true
-          git config --global --add safe.directory $PWD
+          git config --global --add safe.directory "$PWD"
 
       - uses: actions/checkout@main
         with:
@@ -84,7 +87,7 @@ jobs:
         if: ${{ github.event.inputs.command != '' }}
         continue-on-error: true
         run: ${{ github.event.inputs.command }}
-      
+
       - name: Clean old mpv source/build dirs
         run: |
           rm -rf src_packages/mpv
@@ -113,15 +116,8 @@ jobs:
         id: build_mpv_step
         run: |
           ninja -C build_$BIT mpv-release
-          
-      - name: Building mpv
-        id: build_mpv_step
-        env:
-          MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
-        run: |
-          ninja -C build_$BIT mpv-release
-          $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
-      
+          echo "mpv_ver=$(tr -d '\r\n' < src_packages/mpv-release-src/MPV_VERSION 2>/dev/null || echo UNKNOWN)" >> "$GITHUB_OUTPUT"
+
       - name: Upload build logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -129,7 +125,7 @@ jobs:
           name: build-logs
           path: |
             build_*/packages/**/*-stamp/*-*.log
-            
+
       - name: Packaging mpv
         run: |
           mkdir -p release_$BIT
@@ -143,17 +139,17 @@ jobs:
              release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
              ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
-      # ✅ NEW: Upload dev package
       - name: Uploading ${{ matrix.bit }} dev
         uses: actions/upload-artifact@master
         with:
           name: mpv-${{ matrix.bit }}-dev
-          path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
+          path: release_${{ matrix.bit }}/mpv-dev-*
 
       - name: Cleaning build directory
         if: always()
         run: |
           rm -rf build_$BIT/mpv*
+          rm -rf release_$BIT/mpv-debug*.7z
           rm -rf release_$BIT/mpv-dev*.7z
 
       - name: Saving release_${{ matrix.bit }} cache
