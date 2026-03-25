@@ -100,6 +100,12 @@ jobs:
                 -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
 
+      - name: Clean old mpv source/build dirs
+        run: |
+          rm -rf src_packages/mpv
+          rm -rf src_packages/mpv-release-src
+          rm -rf build_${{ matrix.bit }}
+          
       - name: Building mpv
         id: build_mpv_step
         env:
