@@ -87,7 +87,7 @@ ExternalProject_Add(mpv
     PATCH_COMMAND
       ${CMAKE_COMMAND} -E env
         MPV_SOURCE_DIR=<SOURCE_DIR>
-        EZTV_LIB_VER=EzTvLibWin-1.0
+        EZTV_LIB_VER=EzTvLibWin-1.0.1
       /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh          
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
