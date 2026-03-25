@@ -107,7 +107,6 @@ jobs:
         run: |
           ninja -C build_$BIT update
           $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
-          $MPV_TARBALL && echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT || echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
       
       - name: Upload build logs
         if: always()
@@ -130,17 +129,11 @@ jobs:
              release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
              ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
-      - name: Uploading ${{ matrix.bit }} build
+      - name: Uploading ${{ matrix.bit }} dev
         uses: actions/upload-artifact@master
         with:
-          name: mpv-${{ matrix.bit }}
-          path: release_${{ matrix.bit }}/mpv-${{ env.arch }}*
-
-      - name: Uploading ${{ matrix.bit }} debug
-        uses: actions/upload-artifact@master
-        with:
-          name: mpv-${{ matrix.bit }}-debug
-          path: release_${{ matrix.bit }}/mpv-debug-${{ env.arch }}*
+          name: mpv-${{ matrix.bit }}-dev
+          path: release_${{ matrix.bit }}/mpv-dev-*
 
       # ✅ NEW: Upload dev package
       - name: Uploading ${{ matrix.bit }} dev
@@ -153,7 +146,6 @@ jobs:
         if: always()
         run: |
           rm -rf build_$BIT/mpv*
-          rm -rf release_$BIT/mpv-debug*.7z
           rm -rf release_$BIT/mpv-dev*.7z
 
       - name: Saving release_${{ matrix.bit }} cache
