@@ -84,7 +84,13 @@ jobs:
         if: ${{ github.event.inputs.command != '' }}
         continue-on-error: true
         run: ${{ github.event.inputs.command }}
-
+      
+      - name: Clean old mpv source/build dirs
+        run: |
+          rm -rf src_packages/mpv
+          rm -rf src_packages/mpv-release-src
+          rm -rf build_${{ matrix.bit }}
+      
       - name: Configuring CMake & Downloading source
         run: |
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 \
@@ -99,19 +105,13 @@ jobs:
                 -G Ninja --fresh \
                 -B build_$BIT -S $PWD
           ninja -C build_$BIT download || true
-
-      - name: Clean old mpv source/build dirs
-        run: |
-          rm -rf src_packages/mpv
-          rm -rf src_packages/mpv-release-src
-          rm -rf build_${{ matrix.bit }}
           
       - name: Building mpv
         id: build_mpv_step
         env:
           MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
         run: |
-          ninja -C build_$BIT update
+          ninja -C build_$BIT mpv-release
           $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
       
       - name: Upload build logs
@@ -134,12 +134,6 @@ jobs:
           7z a -m0=lzma2 -mx=9 -ms=on \
              release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z \
              ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
-
-      - name: Uploading ${{ matrix.bit }} dev
-        uses: actions/upload-artifact@master
-        with:
-          name: mpv-${{ matrix.bit }}-dev
-          path: release_${{ matrix.bit }}/mpv-dev-*
 
       # ✅ NEW: Upload dev package
       - name: Uploading ${{ matrix.bit }} dev
