@@ -1,4 +1,5 @@
 # Make it fetch latest tarball release since I'm too lazy to manually change it
+set(SOURCE_LOCATION ${SINGLE_SOURCE_LOCATION}/mpv)
 set(PREFIX_DIR ${CMAKE_CURRENT_BINARY_DIR}/mpv-release-prefix)
 file(WRITE ${PREFIX_DIR}/get_latest_tag.sh
 "#!/bin/bash
@@ -91,27 +92,33 @@ ExternalProject_Add_Step(mpv-release strip-binary
 
 ExternalProject_Add_Step(mpv-release copy-binary
     DEPENDEES strip-binary
-    COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/mpv.exe                           ${CMAKE_CURRENT_BINARY_DIR}/mpv-package/mpv.exe
-    COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/mpv.com                           ${CMAKE_CURRENT_BINARY_DIR}/mpv-package/mpv.com
-    COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/mpv.pdf                           ${CMAKE_CURRENT_BINARY_DIR}/mpv-package/doc/manual.pdf
-    COMMAND ${CMAKE_COMMAND} -E copy ${MINGW_INSTALL_PREFIX}/etc/fonts/fonts.conf   ${CMAKE_CURRENT_BINARY_DIR}/mpv-package/mpv/fonts.conf
-    COMMENT "Copying mpv binaries and manual"
+
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv
+    COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/libmpv-2.dll         ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/libmpv-2.dll
+    COMMAND ${CMAKE_COMMAND} -E copy <BINARY_DIR>/libmpv.dll.a         ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/libmpv.dll.a
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/client.h ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/client.h
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render.h ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render.h
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/include/mpv/render_gl.h ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/include/mpv/render_gl.h
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/Copyright            ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/Copyright
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/DOCS/client-api-changes.rst ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev/client-api-changes.rst
+
+    COMMENT "Copying libmpv dev files"
 )
 
-set(RENAME ${CMAKE_CURRENT_BINARY_DIR}/mpv-prefix/src/rename-stable.sh)
+set(RENAME ${CMAKE_CURRENT_BINARY_DIR}/mpv-release-prefix/src/rename-stable.sh)
 file(WRITE ${RENAME}
 "#!/bin/bash
-cd $1
-
+set -e
+cd \"$1\"
 TAG=$(cat MPV_VERSION)
-mv $2 $3/mpv-\${TAG}-$4")
-
+mv \"$2\" \"$3/mpv-dev-${TAG}-$4\"
+")
 
 ExternalProject_Add_Step(mpv-release copy-package-dir
     DEPENDEES copy-binary
     COMMAND chmod 755 ${RENAME}
-    COMMAND ${RENAME} <SOURCE_DIR> ${CMAKE_CURRENT_BINARY_DIR}/mpv-package ${CMAKE_BINARY_DIR} ${TARGET_CPU}${x86_64_LEVEL}
-    COMMENT "Moving mpv package folder"
+    COMMAND ${RENAME} <SOURCE_DIR> ${CMAKE_CURRENT_BINARY_DIR}/mpv-dev ${CMAKE_BINARY_DIR} ${TARGET_CPU}${x86_64_LEVEL}
+    COMMENT "Moving mpv-dev package folder"
     LOG 1
 )
 
