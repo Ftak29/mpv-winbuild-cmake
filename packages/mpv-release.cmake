@@ -41,7 +41,12 @@ ExternalProject_Add(mpv-release
     URL ${LINK}
 
     SOURCE_DIR ${SOURCE_LOCATION}
-
+    PATCH_COMMAND
+      ${CMAKE_COMMAND} -E env
+        MPV_SOURCE_DIR=<SOURCE_DIR>
+        EZTV_LIB_VER=TvEz-1.0
+        /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh
+        
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
