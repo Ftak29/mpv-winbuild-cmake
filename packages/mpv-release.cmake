@@ -1,18 +1,8 @@
 # Make it fetch latest tarball release since I'm too lazy to manually change it
-set(SOURCE_LOCATION ${SINGLE_SOURCE_LOCATION}/mpv)
-set(PREFIX_DIR ${CMAKE_CURRENT_BINARY_DIR}/mpv-release-prefix)
-file(WRITE ${PREFIX_DIR}/get_latest_tag.sh
-"#!/bin/bash
-tag=$(curl -sI https://github.com/mpv-player/mpv/releases/latest | grep 'location: https://github.com/mpv-player/mpv/releases' | sed 's#.*/##g' | tr -d '\r')
-printf 'https://github.com/mpv-player/mpv/archive/%s.tar.gz' $tag")
+set(SOURCE_LOCATION ${SINGLE_SOURCE_LOCATION}/mpv-release-src)
 
-# Workaround since cmake dont allow you to change file permission easily
-file(COPY ${PREFIX_DIR}/get_latest_tag.sh
-     DESTINATION ${PREFIX_DIR}/src
-     FILE_PERMISSIONS OWNER_EXECUTE OWNER_READ)
-
-execute_process(COMMAND ${PREFIX_DIR}/src/get_latest_tag.sh
-                OUTPUT_VARIABLE LINK)
+set(MPV_TAG "v0.41.0" CACHE STRING "mpv release tag")
+set(LINK "https://github.com/mpv-player/mpv/archive/refs/tags/${MPV_TAG}.tar.gz")
 
 ExternalProject_Add(mpv-release
     DEPENDS
