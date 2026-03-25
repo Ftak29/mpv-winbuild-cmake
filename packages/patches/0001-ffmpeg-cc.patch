@@ -28,8 +28,8 @@ index 9b6c766d87..12a2190899 100644
  
 -        if (cc_type != ctx->data_field)
 -            continue;
-+        //if (cc_type != ctx->data_field)
-+        //    continue;
++        if (cc_type != ctx->data_field)
++            continue;
 +
 +        /*
 +         * Auto mode:
