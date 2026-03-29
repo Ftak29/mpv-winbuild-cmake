@@ -105,6 +105,16 @@ jobs:
         env:
           MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
         run: |
+          show_logs() {
+            echo "===== PRINTING CONFIGURE LOGS ====="
+            for p in zlib brotli vulkan-header libiconv zstd; do
+              find build_$BIT/packages/${p}-prefix/src/${p}-stamp -maxdepth 1 -type f -name "${p}-configure-*.log" \
+                -exec sh -c 'echo "===== $1 ====="; sed -n "1,200p" "$1"' _ {} \; || true
+            done
+          }
+
+          trap 'show_logs' ERR
+
           ninja -C build_$BIT update
           $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
       
@@ -135,7 +145,6 @@ jobs:
           name: mpv-${{ matrix.bit }}-dev
           path: release_${{ matrix.bit }}/mpv-dev-*
 
-      # ✅ NEW: Upload dev package
       - name: Uploading ${{ matrix.bit }} dev
         uses: actions/upload-artifact@master
         with:
