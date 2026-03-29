@@ -1,5 +1,6 @@
 set_property(DIRECTORY PROPERTY EP_STEP_TARGETS download)
 include(${PROJECT_SOURCE_DIR}/cmake/packages_check.cmake)
+
 list(APPEND ep
     gmp
     xz
@@ -102,10 +103,12 @@ list(APPEND ep
     libsodium
     megasdk
 )
+
 foreach(package IN LISTS ep)
     if(NOT ${SINGLE_SOURCE_LOCATION} STREQUAL "")
         set(SOURCE_LOCATION "${SINGLE_SOURCE_LOCATION}/${package}")
     endif()
+
     include(${CMAKE_CURRENT_SOURCE_DIR}/${package}.cmake)
     set(SOURCE_LOCATION "")
 
@@ -114,13 +117,38 @@ foreach(package IN LISTS ep)
         list(APPEND repo ${package})
     endif()
 endforeach()
+
 list(LENGTH ep ep_length)
 message(STATUS "Parsing ${ep_length} packages")
 
 # Exclude packages which dont depend on mpv when update
-list(APPEND removed "flac" "opusfile" "libopusenc" "opus-tools" "termcap" "readline" "cryptopp" "sqlite" "libuv" "libsodium" "megasdk" "libsixel" "curl" "libressl" "mbedtls" "nettle" "gmp" "harfbuzz")
+list(APPEND removed
+    "flac"
+    "opusfile"
+    "libopusenc"
+    "opus-tools"
+    "termcap"
+    "readline"
+    "cryptopp"
+    "sqlite"
+    "libuv"
+    "libsodium"
+    "megasdk"
+    "libsixel"
+    "curl"
+    "libressl"
+    "mbedtls"
+    "nettle"
+    "gmp"
+)
+
+# Remove these from both repo and ep
 list(REMOVE_ITEM repo ${removed})
 list(REMOVE_ITEM ep ${removed})
+
+# Remove harfbuzz from update generation only
+list(REMOVE_ITEM repo harfbuzz)
+
 list(TRANSFORM repo APPEND "-force-update" OUTPUT_VARIABLE update)
 list(TRANSFORM ep APPEND "-download" OUTPUT_VARIABLE download)
 list(TRANSFORM ep APPEND "-fullclean" OUTPUT_VARIABLE fullclean)
