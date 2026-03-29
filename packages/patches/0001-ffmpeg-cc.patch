@@ -1,8 +1,34 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..0a64253dd3 100644
+index 9b6c766d87..f60dba3ccc 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
-@@ -387,12 +387,9 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
+@@ -33,6 +33,25 @@
+ #define UNSET_FLAG(var, val) ( (var) &=  ~( 1 << (val)) )
+ #define CHECK_FLAG(var, val) ( (var) &    ( 1 << (val)) )
+ 
++#ifdef __ANDROID__
++#include <android/log.h>
++#define CCLOG(...) __android_log_print(ANDROID_LOG_ERROR, "CC608DBG", __VA_ARGS__)
++#else
++#include <stdio.h>
++#include <stdarg.h>
++static void CCLOG(const char *fmt, ...)
++{
++    FILE *f = fopen("C:\\temp\\cc608dbg.txt", "a");
++    if (!f)
++        return;
++    va_list args;
++    va_start(args, fmt);
++    vfprintf(f, fmt, args);
++    va_end(args);
++    fclose(f);
++}
++#endif
++
+ static const AVRational ms_tb = {1, 1000};
+ 
+ enum cc_mode {
+@@ -387,12 +406,9 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
  
      // if EIA-608 data then verify parity.
      if (cc_type==0 || cc_type==1) {
@@ -18,7 +44,7 @@ index 9b6c766d87..0a64253dd3 100644
      }
  
      //Skip non-data
-@@ -501,7 +498,8 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -501,7 +517,8 @@ static int capture_screen(CCaptionSubContext *ctx)
  
              x = ASS_DEFAULT_PLAYRESX * (0.1 + 0.0250 * j);
              y = ASS_DEFAULT_PLAYRESY * (0.1 + 0.0533 * i);
@@ -28,7 +54,7 @@ index 9b6c766d87..0a64253dd3 100644
  
              for (; j < SCREEN_COLUMNS; j++) {
                  const char *e_tag = "", *s_tag = "", *c_tag = "", *b_tag = "";
-@@ -621,6 +619,57 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+@@ -621,6 +638,57 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
      ctx->buffer_time[1] = pts;
  }
  
@@ -86,7 +112,7 @@ index 9b6c766d87..0a64253dd3 100644
  static void handle_bgattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
      const int i = (lo & 0xf) >> 1;
-@@ -869,15 +918,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -869,15 +937,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      for (i = 0; i < len; i += 3) {
          uint8_t hi, cc_type = bptr[i] & 1;
  
@@ -112,7 +138,7 @@ index 9b6c766d87..0a64253dd3 100644
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
              return ret;
-@@ -930,10 +985,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -930,10 +1004,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          capture_screen(ctx);
          ctx->buffer_changed = 0;
  
