@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..d08e108a3b 100644
+index 9b6c766d87..656a801ba6 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,12 +20,32 @@
@@ -839,7 +839,14 @@ index 9b6c766d87..d08e108a3b 100644
          ctx->buffer_changed = 0;
  
          if (!ctx->real_time && ctx->mode == CCMODE_POPON)
-@@ -897,8 +939,7 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -893,12 +935,14 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ 
+         if (ctx->buffer[bidx].str[0] || ctx->real_time) {
+             ff_dlog(avctx, "cdp writing data (%s)\n", ctx->buffer[bidx].str);
++            CCLOG("EMIT pts=%lld text=%s\n",
++                  (long long)ctx->buffer_time[0],
++                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
+             start_time = ctx->buffer_time[0];
              sub->pts = start_time;
              end_time = ctx->buffer_time[1];
              if (!ctx->real_time)
@@ -849,7 +856,15 @@ index 9b6c766d87..d08e108a3b 100644
              else
                  sub->end_display_time = -1;
              ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
-@@ -916,8 +957,7 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -911,13 +955,15 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ 
+     if (!bptr && !ctx->real_time && ctx->buffer[!ctx->buffer_index].str[0]) {
+         bidx = !ctx->buffer_index;
++        CCLOG("EMIT_FLUSH pts=%lld text=%s\n",
++              (long long)ctx->buffer_time[1],
++              ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
+         ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
+         if (ret < 0)
              return ret;
          av_bprint_clear(&ctx->buffer[bidx]);
          sub->pts = ctx->buffer_time[1];
@@ -859,7 +874,7 @@ index 9b6c766d87..d08e108a3b 100644
          if (sub->end_display_time == 0)
              sub->end_display_time = ctx->buffer[bidx].len * 20;
      }
-@@ -926,7 +966,6 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -926,10 +972,12 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
          ctx->last_real_time = sub->pts;
          ctx->screen_touched = 0;
@@ -867,7 +882,13 @@ index 9b6c766d87..d08e108a3b 100644
          capture_screen(ctx);
          ctx->buffer_changed = 0;
  
-@@ -946,10 +985,10 @@ static const AVOption options[] = {
++        CCLOG("EMIT_REALTIME pts=%lld text=%s\n",
++              (long long)sub->pts,
++              ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
+         ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
+         if (ret < 0)
+             return ret;
+@@ -946,10 +994,10 @@ static const AVOption options[] = {
      { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, SD },
      { "real_time_latency_msec", "minimum elapsed time between emitting real-time subtitle events", OFFSET(real_time_latency_msec), AV_OPT_TYPE_INT, { .i64 = 200 }, 0, 500, SD },
      { "data_field", "select data field", OFFSET(data_field), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, SD, .unit = "data_field" },
