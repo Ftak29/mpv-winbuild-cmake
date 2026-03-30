@@ -1,107 +1,50 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..0a7c436b07 100644
+index 9b6c766d87..62baaeadca 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
-@@ -24,10 +24,28 @@
- #include "ass.h"
- #include "codec_internal.h"
- #include "libavutil/attributes.h"
-+#include "libavutil/avstring.h"
- #include "libavutil/opt.h"
-+#include <string.h>
-+
-+#if defined(__ANDROID__)
+@@ -33,6 +33,25 @@
+ #define UNSET_FLAG(var, val) ( (var) &=  ~( 1 << (val)) )
+ #define CHECK_FLAG(var, val) ( (var) &    ( 1 << (val)) )
+ 
++#ifdef __ANDROID__
 +#include <android/log.h>
 +#define CCLOG(...) __android_log_print(ANDROID_LOG_ERROR, "CC608DBG", __VA_ARGS__)
 +#else
-+#include <stdarg.h>
 +#include <stdio.h>
++#include <stdarg.h>
 +static void CCLOG(const char *fmt, ...)
 +{
++    FILE *f = fopen("C:\\\\temp\\\\cc608dbg.txt", "a");
++    if (!f)
++        return;
 +    va_list args;
 +    va_start(args, fmt);
-+    vfprintf(stderr, fmt, args);
++    vfprintf(f, fmt, args);
 +    va_end(args);
++    fclose(f);
 +}
 +#endif
++
+ static const AVRational ms_tb = {1, 1000};
  
- #define SCREEN_ROWS 15
- #define SCREEN_COLUMNS 32
-+#define REALTIME_TEXT_CACHE 1024
+ enum cc_mode {
+@@ -387,12 +406,9 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
  
- #define SET_FLAG(var, val)   ( (var) |=   ( 1 << (val)) )
- #define UNSET_FLAG(var, val) ( (var) &=  ~( 1 << (val)) )
-@@ -276,6 +294,8 @@ typedef struct CCaptionSubContext {
-     int64_t last_real_time;
-     uint8_t prev_cmd[2];
-     int readorder;
-+    char prev_realtime_text[REALTIME_TEXT_CACHE];
-+    char last_emitted_realtime[REALTIME_TEXT_CACHE];
- } CCaptionSubContext;
- 
- static av_cold int init_decoder(AVCodecContext *avctx)
-@@ -291,6 +311,8 @@ static av_cold int init_decoder(AVCodecContext *avctx)
-     ctx->bg_color = CCCOL_BLACK;
-     ctx->rollup = 2;
-     ctx->cursor_row = 10;
-+    ctx->prev_realtime_text[0] = 0;
-+    ctx->last_emitted_realtime[0] = 0;
-     return ff_ass_subtitle_header(avctx, "Monospace",
-                                  ASS_DEFAULT_FONT_SIZE,
-                                  ASS_DEFAULT_COLOR,
-@@ -329,6 +351,8 @@ static av_cold void flush_decoder(AVCodecContext *avctx)
-     ctx->last_real_time = 0;
-     ctx->screen_touched = 0;
-     ctx->buffer_changed = 0;
-+    ctx->prev_realtime_text[0] = 0;
-+    ctx->last_emitted_realtime[0] = 0;
-     if (!(avctx->flags2 & AV_CODEC_FLAG2_RO_FLUSH_NOOP))
-         ctx->readorder = 0;
-     av_bprint_clear(&ctx->buffer[0]);
-@@ -377,31 +401,29 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
-  */
- static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
- {
--    uint8_t cc_valid = (*cc_data_pair & 4) >>2;
--    uint8_t cc_type = *cc_data_pair & 3;
-+    uint8_t cc_valid = (*cc_data_pair & 4) >> 2;
-+    uint8_t cc_type  = *cc_data_pair & 3;
- 
-     *hi = cc_data_pair[1];
- 
-     if (!cc_valid)
-         return AVERROR_INVALIDDATA;
- 
--    // if EIA-608 data then verify parity.
--    if (cc_type==0 || cc_type==1) {
+     // if EIA-608 data then verify parity.
+     if (cc_type==0 || cc_type==1) {
 -        if (!av_parity(cc_data_pair[2])) {
-+    /* if EIA-608 data then verify parity */
-+    if (cc_type == 0 || cc_type == 1) {
-+        if (!av_parity(cc_data_pair[2]) || !av_parity(cc_data_pair[1])) {
-+            /* drop pair instead of poisoning decoder */
-             return AVERROR_INVALIDDATA;
-         }
+-            return AVERROR_INVALIDDATA;
+-        }
 -        if (!av_parity(cc_data_pair[1])) {
 -            *hi = 0x7F;
 -        }
++      if (!av_parity(cc_data_pair[2]) || !av_parity(cc_data_pair[1])) {
++        // drop pair instead of poisoning decoder
++      return AVERROR_INVALIDDATA;
      }
  
--    //Skip non-data
--    if ((cc_data_pair[0] == 0xFA || cc_data_pair[0] == 0xFC || cc_data_pair[0] == 0xFD)
--         && (cc_data_pair[1] & 0x7F) == 0 && (cc_data_pair[2] & 0x7F) == 0)
-+    /* Skip non-data */
-+    if ((cc_data_pair[0] == 0xFA || cc_data_pair[0] == 0xFC || cc_data_pair[0] == 0xFD) &&
-+        (cc_data_pair[1] & 0x7F) == 0 && (cc_data_pair[2] & 0x7F) == 0)
-         return AVERROR_PATCHWELCOME;
- 
--    //skip 708 data
--    if (cc_type == 3 || cc_type == 2)
-+    /* skip 708 data */
-+    if (cc_type == 2 || cc_type == 3)
-         return AVERROR_PATCHWELCOME;
- 
-     return 0;
-@@ -501,7 +523,8 @@ static int capture_screen(CCaptionSubContext *ctx)
+     //Skip non-data
+@@ -501,7 +517,8 @@ static int capture_screen(CCaptionSubContext *ctx)
  
              x = ASS_DEFAULT_PLAYRESX * (0.1 + 0.0250 * j);
              y = ASS_DEFAULT_PLAYRESY * (0.1 + 0.0533 * i);
@@ -111,7 +54,7 @@ index 9b6c766d87..0a7c436b07 100644
  
              for (; j < SCREEN_COLUMNS; j++) {
                  const char *e_tag = "", *s_tag = "", *c_tag = "", *b_tag = "";
-@@ -621,6 +644,122 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+@@ -621,6 +638,57 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
      ctx->buffer_time[1] = pts;
  }
  
@@ -151,80 +94,15 @@ index 9b6c766d87..0a7c436b07 100644
 +    return score;
 +}
 +
-+static void cc608_visible_text_stats(const char *s, int *letters, int *vowels, int *spaces)
-+{
-+    int in_tag = 0;
-+
-+    *letters = 0;
-+    *vowels  = 0;
-+    *spaces  = 0;
-+
-+    if (!s)
-+        return;
-+
-+    for (; *s; s++) {
-+        unsigned char ch = *s;
-+
-+        if (in_tag) {
-+            if (ch == '}')
-+                in_tag = 0;
-+            continue;
-+        }
-+
-+        if (ch == '{') {
-+            in_tag = 1;
-+            continue;
-+        }
-+
-+        if (ch == '\\') {
-+            if (s[1] == 'N' || s[1] == 'h') {
-+                if (s[1] == 'N')
-+                    (*spaces)++;
-+                s++;
-+                continue;
-+            }
-+        }
-+
-+        if (ch == ' ') {
-+            (*spaces)++;
-+            continue;
-+        }
-+
-+        if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
-+            (*letters)++;
-+            switch (ch | 32) {
-+            case 'a':
-+            case 'e':
-+            case 'i':
-+            case 'o':
-+            case 'u':
-+                (*vowels)++;
-+                break;
-+            }
-+        }
-+    }
-+}
-+
 +static int cc608_should_emit_realtime(const char *s)
 +{
-+    int score;
-+    int letters, vowels, spaces;
++    int score = cc608_visible_text_score(s);
 +
 +    if (!s || !s[0])
 +        return 0;
 +
-+    score = cc608_visible_text_score(s);
-+    if (score < 10)
-+        return 0;
-+
-+    cc608_visible_text_stats(s, &letters, &vowels, &spaces);
-+
-+    /*
-+     * Reject obvious warm-up garbage such as "NNCPANNCNN":
-+     * long consonant-heavy text with no spaces is very unlikely
-+     * to be a real subtitle line.
-+     */
-+    if (letters > 0 && spaces == 0 && vowels * 4 < letters && score < 20)
++    /* Suppress empty / tiny incremental paints like "EX", "TR", quotes, etc. */
++    if (score < 8)
 +        return 0;
 +
 +    return 1;
@@ -234,7 +112,7 @@ index 9b6c766d87..0a7c436b07 100644
  static void handle_bgattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
      const int i = (lo & 0xf) >> 1;
-@@ -869,15 +1008,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -869,15 +937,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      for (i = 0; i < len; i += 3) {
          uint8_t hi, cc_type = bptr[i] & 1;
  
@@ -260,49 +138,27 @@ index 9b6c766d87..0a7c436b07 100644
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
              return ret;
-@@ -924,16 +1069,41 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
- 
-     if (ctx->real_time && ctx->screen_touched &&
-         sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
-+        const char *rt_text;
-+
-         ctx->last_real_time = sub->pts;
-         ctx->screen_touched = 0;
- 
+@@ -930,10 +1004,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          capture_screen(ctx);
          ctx->buffer_changed = 0;
--
+ 
 -        ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
 -        if (ret < 0)
 -            return ret;
 -        sub->end_display_time = -1;
-+        rt_text = ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "";
-+
-+        if (!cc608_should_emit_realtime(rt_text)) {
-+            ctx->prev_realtime_text[0] = 0;
-+            CCLOG("SKIP_REALTIME pts=%lld score=%d text=%s\n",
-+                  (long long)sub->pts,
-+                  cc608_visible_text_score(rt_text),
-+                  rt_text);
-+        } else if (!strcmp(rt_text, ctx->last_emitted_realtime)) {
-+            CCLOG("SKIP_DUPLICATE pts=%lld text=%s\n",
-+                  (long long)sub->pts,
-+                  rt_text);
-+        } else if (strcmp(rt_text, ctx->prev_realtime_text)) {
-+            av_strlcpy(ctx->prev_realtime_text, rt_text, sizeof(ctx->prev_realtime_text));
-+            CCLOG("HOLD_REALTIME pts=%lld text=%s\n",
-+                  (long long)sub->pts,
-+                  rt_text);
-+        } else {
++        if (cc608_should_emit_realtime(ctx->buffer[bidx].str)) {
 +            CCLOG("EMIT_REALTIME pts=%lld text=%s\n",
 +                  (long long)sub->pts,
-+                  rt_text);
-+            ret = ff_ass_add_rect2(sub, rt_text, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
++                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
++            ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
 +            if (ret < 0)
 +                return ret;
 +            sub->end_display_time = -1;
-+            av_strlcpy(ctx->last_emitted_realtime, rt_text, sizeof(ctx->last_emitted_realtime));
-+            ctx->prev_realtime_text[0] = 0;
++        } else {
++            CCLOG("SKIP_REALTIME pts=%lld score=%d text=%s\n",
++                  (long long)sub->pts,
++                  cc608_visible_text_score(ctx->buffer[bidx].str),
++                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
 +        }
      }
  
