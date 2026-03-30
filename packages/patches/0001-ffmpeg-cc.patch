@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..033497a2dc 100644
+index 9b6c766d87..0a7c436b07 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -24,10 +24,28 @@
@@ -111,7 +111,7 @@ index 9b6c766d87..033497a2dc 100644
  
              for (; j < SCREEN_COLUMNS; j++) {
                  const char *e_tag = "", *s_tag = "", *c_tag = "", *b_tag = "";
-@@ -621,6 +644,124 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+@@ -621,6 +644,122 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
      ctx->buffer_time[1] = pts;
  }
  
@@ -135,16 +135,14 @@ index 9b6c766d87..033497a2dc 100644
 +            continue;
 +        }
 +
-+        if (*s == '\') {
++        if (*s == '\\') {
 +            if (s[1] == 'N' || s[1] == 'h') {
 +                s++;
 +                continue;
 +            }
 +        }
 +
-+        if (*s == ' ' || *s == '
-+' || *s == '
-+' || *s == '	')
++        if (*s == ' ' || *s == '\r' || *s == '\n' || *s == '\t')
 +            continue;
 +
 +        score++;
@@ -178,7 +176,7 @@ index 9b6c766d87..033497a2dc 100644
 +            continue;
 +        }
 +
-+        if (ch == '\') {
++        if (ch == '\\') {
 +            if (s[1] == 'N' || s[1] == 'h') {
 +                if (s[1] == 'N')
 +                    (*spaces)++;
@@ -236,7 +234,7 @@ index 9b6c766d87..033497a2dc 100644
  static void handle_bgattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
      const int i = (lo & 0xf) >> 1;
-@@ -869,15 +1010,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -869,15 +1008,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      for (i = 0; i < len; i += 3) {
          uint8_t hi, cc_type = bptr[i] & 1;
  
@@ -262,7 +260,7 @@ index 9b6c766d87..033497a2dc 100644
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
              return ret;
-@@ -924,16 +1071,41 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -924,16 +1069,41 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
  
      if (ctx->real_time && ctx->screen_touched &&
          sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
