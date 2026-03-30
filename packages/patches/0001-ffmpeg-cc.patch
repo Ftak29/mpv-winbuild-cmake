@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..0f2228d193 100644
+index 9b6c766d87..e93a9016dc 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,6 +20,7 @@
@@ -170,17 +170,47 @@ index 9b6c766d87..0f2228d193 100644
          ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
          if (ret < 0)
              return ret;
-@@ -930,12 +1011,11 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -924,18 +1005,42 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ 
+     if (ctx->real_time && ctx->screen_touched &&
+         sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
+-        ctx->last_real_time = sub->pts;
+-        ctx->screen_touched = 0;
++        const char *txt;
++        int score;
+ 
          capture_screen(ctx);
          ctx->buffer_changed = 0;
  
 -        ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
--        if (ret < 0)
--            return ret;
--        sub->end_display_time = -1;
-+        CCLOG("SKIP_REALTIME_DISABLED pts=%lld text=%s\n",
-+              (long long)sub->pts,
-+              ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
++        txt = ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "";
++        score = cc608_visible_text_score(txt);
++
++        ctx->screen_touched = 0;
++
++        /* reject very short junk */
++        if (score < 8) {
++            CCLOG("SKIP_REALTIME_SHORT pts=%lld score=%d text=%s\n",
++                  (long long)sub->pts, score, txt);
++            return avpkt->size;
++        }
++
++        /* reject obvious junk bursts */
++        if (strstr(txt, "NNC") || strstr(txt, "CPA")) {
++            CCLOG("SKIP_REALTIME_JUNK pts=%lld text=%s\n",
++                  (long long)sub->pts, txt);
++            return avpkt->size;
++        }
++
++        ctx->last_real_time = sub->pts;
++
++        CCLOG("EMIT_REALTIME pts=%lld text=%s\n",
++              (long long)sub->pts, txt);
++
++        ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
+         if (ret < 0)
+             return ret;
+         sub->end_display_time = -1;
      }
 -
 +    
