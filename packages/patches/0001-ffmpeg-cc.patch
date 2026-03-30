@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..62baaeadca 100644
+index 9b6c766d87..f60dba3ccc 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -33,6 +33,25 @@
@@ -14,7 +14,7 @@ index 9b6c766d87..62baaeadca 100644
 +#include <stdarg.h>
 +static void CCLOG(const char *fmt, ...)
 +{
-+    FILE *f = fopen("C:\\\\temp\\\\cc608dbg.txt", "a");
++    FILE *f = fopen("C:\\temp\\cc608dbg.txt", "a");
 +    if (!f)
 +        return;
 +    va_list args;
