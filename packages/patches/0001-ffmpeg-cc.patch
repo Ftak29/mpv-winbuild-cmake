@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..ce065140fd 100644
+index 9b6c766d87..0f2228d193 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,6 +20,7 @@
@@ -148,7 +148,29 @@ index 9b6c766d87..ce065140fd 100644
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
              return ret;
-@@ -930,10 +1003,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -893,6 +966,11 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ 
+         if (ctx->buffer[bidx].str[0] || ctx->real_time) {
+             ff_dlog(avctx, "cdp writing data (%s)\n", ctx->buffer[bidx].str);
++            CCLOG("EMIT_NORMAL pts=%lld text=%s\n",
++                  (long long)ctx->buffer_time[0],
++                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
++            start_time = ctx->buffer_time[0];
++            
+             start_time = ctx->buffer_time[0];
+             sub->pts = start_time;
+             end_time = ctx->buffer_time[1];
+@@ -911,6 +989,9 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ 
+     if (!bptr && !ctx->real_time && ctx->buffer[!ctx->buffer_index].str[0]) {
+         bidx = !ctx->buffer_index;
++        CCLOG("EMIT_FLUSH pts=%lld text=%s\n",
++              (long long)ctx->buffer_time[1],
++              ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");        
+         ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
+         if (ret < 0)
+             return ret;
+@@ -930,12 +1011,11 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          capture_screen(ctx);
          ctx->buffer_changed = 0;
  
@@ -156,20 +178,12 @@ index 9b6c766d87..ce065140fd 100644
 -        if (ret < 0)
 -            return ret;
 -        sub->end_display_time = -1;
-+        if (cc608_should_emit_realtime(ctx->buffer[bidx].str)) {
-+            CCLOG("EMIT_REALTIME pts=%lld text=%s\n",
-+                  (long long)sub->pts,
-+                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
-+            ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
-+            if (ret < 0)
-+                return ret;
-+            sub->end_display_time = -1;
-+        } else {
-+            CCLOG("SKIP_REALTIME pts=%lld score=%d text=%s\n",
-+                  (long long)sub->pts,
-+                  cc608_visible_text_score(ctx->buffer[bidx].str),
-+                  ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
-+        }
++        CCLOG("SKIP_REALTIME_DISABLED pts=%lld text=%s\n",
++              (long long)sub->pts,
++              ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "");
      }
- 
+-
++    
      *got_sub = sub->num_rects > 0;
+     return avpkt->size;
+ }
