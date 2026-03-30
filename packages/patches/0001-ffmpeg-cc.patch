@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..f60dba3ccc 100644
+index 9b6c766d87..0efae52f91 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -33,6 +33,25 @@
@@ -28,23 +28,48 @@ index 9b6c766d87..f60dba3ccc 100644
  static const AVRational ms_tb = {1, 1000};
  
  enum cc_mode {
-@@ -387,12 +406,9 @@ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
+@@ -377,30 +396,28 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
+  */
+ static int validate_cc_data_pair(const uint8_t *cc_data_pair, uint8_t *hi)
+ {
+-    uint8_t cc_valid = (*cc_data_pair & 4) >>2;
+-    uint8_t cc_type = *cc_data_pair & 3;
++    uint8_t cc_valid = (*cc_data_pair & 4) >> 2;
++    uint8_t cc_type  = *cc_data_pair & 3;
  
-     // if EIA-608 data then verify parity.
-     if (cc_type==0 || cc_type==1) {
+     *hi = cc_data_pair[1];
+ 
+     if (!cc_valid)
+         return AVERROR_INVALIDDATA;
+ 
+-    // if EIA-608 data then verify parity.
+-    if (cc_type==0 || cc_type==1) {
 -        if (!av_parity(cc_data_pair[2])) {
--            return AVERROR_INVALIDDATA;
--        }
++    /* if EIA-608 data then verify parity */
++    if (cc_type == 0 || cc_type == 1) {
++        if (!av_parity(cc_data_pair[2]) || !av_parity(cc_data_pair[1])) {
++            /* drop pair instead of poisoning decoder */
+             return AVERROR_INVALIDDATA;
+         }
 -        if (!av_parity(cc_data_pair[1])) {
 -            *hi = 0x7F;
 -        }
-+      if (!av_parity(cc_data_pair[2]) || !av_parity(cc_data_pair[1])) {
-+        // drop pair instead of poisoning decoder
-+      return AVERROR_INVALIDDATA;
      }
  
-     //Skip non-data
-@@ -501,7 +517,8 @@ static int capture_screen(CCaptionSubContext *ctx)
+-    //Skip non-data
+-    if ((cc_data_pair[0] == 0xFA || cc_data_pair[0] == 0xFC || cc_data_pair[0] == 0xFD)
+-         && (cc_data_pair[1] & 0x7F) == 0 && (cc_data_pair[2] & 0x7F) == 0)
++    /* Skip non-data */
++    if ((cc_data_pair[0] == 0xFA || cc_data_pair[0] == 0xFC || cc_data_pair[0] == 0xFD) &&
++        (cc_data_pair[1] & 0x7F) == 0 && (cc_data_pair[2] & 0x7F) == 0)
+         return AVERROR_PATCHWELCOME;
+ 
+-    //skip 708 data
++    /* skip 708 data */
+     if (cc_type == 3 || cc_type == 2)
+         return AVERROR_PATCHWELCOME;
+ 
+@@ -501,7 +518,8 @@ static int capture_screen(CCaptionSubContext *ctx)
  
              x = ASS_DEFAULT_PLAYRESX * (0.1 + 0.0250 * j);
              y = ASS_DEFAULT_PLAYRESY * (0.1 + 0.0533 * i);
@@ -54,7 +79,7 @@ index 9b6c766d87..f60dba3ccc 100644
  
              for (; j < SCREEN_COLUMNS; j++) {
                  const char *e_tag = "", *s_tag = "", *c_tag = "", *b_tag = "";
-@@ -621,6 +638,57 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+@@ -621,6 +639,57 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
      ctx->buffer_time[1] = pts;
  }
  
@@ -112,7 +137,7 @@ index 9b6c766d87..f60dba3ccc 100644
  static void handle_bgattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
      const int i = (lo & 0xf) >> 1;
-@@ -869,15 +937,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -869,15 +938,21 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      for (i = 0; i < len; i += 3) {
          uint8_t hi, cc_type = bptr[i] & 1;
  
@@ -138,7 +163,7 @@ index 9b6c766d87..f60dba3ccc 100644
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
              return ret;
-@@ -930,10 +1004,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -930,10 +1005,20 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          capture_screen(ctx);
          ctx->buffer_changed = 0;
  
