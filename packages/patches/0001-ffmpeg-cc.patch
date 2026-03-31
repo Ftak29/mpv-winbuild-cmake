@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..7cd9a4aa78 100644
+index 9b6c766d87..55cf6b89a6 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,11 +20,33 @@
@@ -227,7 +227,7 @@ index 9b6c766d87..7cd9a4aa78 100644
      CCaptionSubContext *ctx = avctx->priv_data;
 +    int ret;
 +
-+    if (!txt || !txt[0])
++    if (!cc608_has_meaningful_text(txt))
 +        return 0;
 +
 +    sub->pts = pts;
@@ -914,7 +914,7 @@ index 9b6c766d87..7cd9a4aa78 100644
          ctx->buffer_changed = 0;
  
          if (!ctx->real_time && ctx->mode == CCMODE_POPON)
-@@ -892,20 +1009,67 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -892,20 +1009,62 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          update_time(ctx, in_time);
  
          if (ctx->buffer[bidx].str[0] || ctx->real_time) {
@@ -952,17 +952,12 @@ index 9b6c766d87..7cd9a4aa78 100644
 +                cc608_store_text(&ctx->last_seen_text, txt);
 +                ctx->last_seen_pts = sub->pts;
 +
-+                if (!txt[0]) {
-+                    if (ctx->pending_text && ctx->pending_text[0] &&
-+                        !(ctx->last_emit_text && strcmp(ctx->last_emit_text, ctx->pending_text) == 0) &&
-+                        !cc608_is_trivial_realtime_text(ctx->pending_text)) {
-+                        ret = cc608_emit_realtime_text(avctx, sub, &nb_rect_allocated,
-+                                                       ctx->pending_text, ctx->pending_pts);
-+                        if (ret < 0)
-+                            return ret;
-+                    }
++                if (!cc608_has_meaningful_text(txt)) {
++                    CCLOG("RT_SKIP_EMPTY pts=%lld
++", (long long)sub->pts);
 +                    av_freep(&ctx->pending_text);
 +                    ctx->pending_pts = AV_NOPTS_VALUE;
++                    ctx->screen_touched = 0;
 +                } else if (!ctx->pending_text) {
 +                    cc608_store_text(&ctx->pending_text, txt);
 +                    ctx->pending_pts = sub->pts;
@@ -993,7 +988,7 @@ index 9b6c766d87..7cd9a4aa78 100644
          }
      }
  
-@@ -916,24 +1080,28 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -916,24 +1075,28 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
              return ret;
          av_bprint_clear(&ctx->buffer[bidx]);
          sub->pts = ctx->buffer_time[1];
@@ -1035,7 +1030,7 @@ index 9b6c766d87..7cd9a4aa78 100644
      }
  
      *got_sub = sub->num_rects > 0;
-@@ -946,10 +1114,10 @@ static const AVOption options[] = {
+@@ -946,10 +1109,10 @@ static const AVOption options[] = {
      { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, SD },
      { "real_time_latency_msec", "minimum elapsed time between emitting real-time subtitle events", OFFSET(real_time_latency_msec), AV_OPT_TYPE_INT, { .i64 = 200 }, 0, 500, SD },
      { "data_field", "select data field", OFFSET(data_field), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, SD, .unit = "data_field" },
