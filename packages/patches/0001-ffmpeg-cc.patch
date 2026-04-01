@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..ab15ac2257 100644
+index 9b6c766d87..0a806fb809 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,11 +20,33 @@
@@ -1073,8 +1073,12 @@ index 9b6c766d87..ab15ac2257 100644
      }
  
      *got_sub = sub->num_rects > 0;
-@@ -946,10 +1152,10 @@ static const AVOption options[] = {
-     { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, SD },
+@@ -943,13 +1149,13 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+ #define OFFSET(x) offsetof(CCaptionSubContext, x)
+ #define SD AV_OPT_FLAG_SUBTITLE_PARAM | AV_OPT_FLAG_DECODING_PARAM
+ static const AVOption options[] = {
+-    { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, SD },
++    { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 1 }, 0, 1, SD },
      { "real_time_latency_msec", "minimum elapsed time between emitting real-time subtitle events", OFFSET(real_time_latency_msec), AV_OPT_TYPE_INT, { .i64 = 200 }, 0, 500, SD },
      { "data_field", "select data field", OFFSET(data_field), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, SD, .unit = "data_field" },
 -    { "auto",   "pick first one that appears", 0, AV_OPT_TYPE_CONST, { .i64 =-1 }, 0, 0, SD, .unit = "data_field" },
