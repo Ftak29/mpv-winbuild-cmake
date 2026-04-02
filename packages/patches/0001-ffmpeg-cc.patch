@@ -1,8 +1,8 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..30e03f0238 100644
+index 9b6c766d87..f640eba8ec 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
-@@ -20,11 +20,33 @@
+@@ -20,11 +20,34 @@
   */
  
  #include <assert.h>
@@ -14,6 +14,7 @@ index 9b6c766d87..30e03f0238 100644
  #include "libavutil/opt.h"
 +#include "libavutil/mem.h"
 +#include "libavutil/avstring.h"
++#include "libavutil/mem.h"
 +
 +#ifdef __ANDROID__
 +#include <android/log.h>
@@ -36,7 +37,7 @@ index 9b6c766d87..30e03f0238 100644
  
  #define SCREEN_ROWS 15
  #define SCREEN_COLUMNS 32
-@@ -168,7 +190,7 @@ enum cc_charset {
+@@ -168,7 +191,7 @@ enum cc_charset {
          ENTRY(0x3d, "\u2510")                            \
          ENTRY(0x3e, "\u2514")                            \
          ENTRY(0x3f, "\u2518")                            \
@@ -45,7 +46,7 @@ index 9b6c766d87..30e03f0238 100644
  
  static const char charset_overrides[4][128][sizeof("\u266a")] =
  {
-@@ -187,8 +209,7 @@ static const char charset_overrides[4][128][sizeof("\u266a")] =
+@@ -187,8 +210,7 @@ static const char charset_overrides[4][128][sizeof("\u266a")] =
                    "'" str "' string takes too much space");
  CHARSET_OVERRIDE_LIST(EMPTY_START, ASSERT_ENTRY, EMPTY_END)
  
@@ -55,7 +56,7 @@ index 9b6c766d87..30e03f0238 100644
      CCCOL_WHITE,
      CCCOL_GREEN,
      CCCOL_BLUE,
-@@ -199,56 +220,47 @@ static const unsigned char bg_attribs[8] = // Color
+@@ -199,56 +221,47 @@ static const unsigned char bg_attribs[8] = // Color
      CCCOL_BLACK,
  };
  
@@ -145,19 +146,19 @@ index 9b6c766d87..30e03f0238 100644
      int16_t row_used;
  };
  
-@@ -276,21 +288,186 @@ typedef struct CCaptionSubContext {
+@@ -274,23 +287,65 @@ typedef struct CCaptionSubContext {
+     int64_t buffer_time[2];
+     int screen_touched;
      int64_t last_real_time;
++    char *last_emit_text;
      uint8_t prev_cmd[2];
      int readorder;
 +    int debug_pairs_logged;
 +    char *last_emit_text;
 +    char *last_seen_text;
 +    int64_t last_seen_pts;
-+    char *pending_text;
-+    int64_t pending_pts;
  } CCaptionSubContext;
  
--static av_cold int init_decoder(AVCodecContext *avctx)
 +static void cc608_store_text(char **dst, const char *src)
 +{
 +    char *tmp = NULL;
@@ -188,138 +189,17 @@ index 9b6c766d87..30e03f0238 100644
 +    return strncmp(prev, cur, prev_len) == 0;
 +}
 +
-+static int cc608_is_trivial_realtime_text(const char *txt)
-+{
-+    size_t i, len;
-+    int alpha = 0;
 +
-+    if (!txt)
-+        return 1;
-+
-+    len = strlen(txt);
-+    if (len < 4)
-+        return 1;
-+
-+    for (i = 0; i < len; i++) {
-+        unsigned char ch = txt[i];
-+
-+        if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) {
-+            alpha = 1;
-+            continue;
-+        }
-+
-+        if (ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t' ||
-+            ch == '>' || ch == '.' || ch == ',' || ch == '?' || ch == '!' ||
-+            ch == '\'' || ch == 0xE2)
-+            continue;
-+
-+        if (ch < 0x20)
-+            return 1;
-+    }
-+
-+    return !alpha;
-+}
-+
-+
-+static int cc608_has_meaningful_text(const char *txt)
-+{
-+    if (!txt)
-+        return 0;
-+
-+    while (*txt) {
-+        unsigned char ch = (unsigned char)*txt;
-+
-+        if (ch > ' ' && ch != '\n' && ch != '\r' && ch != '\t')
-+            return 1;
-+
-+        txt++;
-+    }
-+
-+    return 0;
-+}
-+
-+
-+static int cc608_should_emit_pending(const char *pending, const char *next, const char *last_emit)
-+{
-+    if (!cc608_has_meaningful_text(pending))
-+        return 0;
-+
-+    if (last_emit && strcmp(last_emit, pending) == 0)
-+        return 0;
-+
-+    if (cc608_is_trivial_realtime_text(pending))
-+        return 0;
-+
-+    if (next && cc608_is_prefix_growth(pending, next))
-+        return 0;
-+
-+    return 1;
-+}
-+
-+static int cc608_emit_realtime_text(AVCodecContext *avctx, AVSubtitle *sub,
-+                                    unsigned *nb_rect_allocated,
-+                                    const char *txt, int64_t pts)
+ static av_cold int init_decoder(AVCodecContext *avctx)
  {
      CCaptionSubContext *ctx = avctx->priv_data;
-+    int ret;
-+
-+    if (!cc608_has_meaningful_text(txt))
-+        return 0;
-+
-+    sub->pts = pts;
-+    sub->end_display_time = -1;
-+
-+    CCLOG("RT_EMIT_DELAYED pts=%lld text=%s\n", (long long)pts, txt);
-+
-+    ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, nb_rect_allocated);
-+    if (ret < 0)
-+        return ret;
-+
-+    cc608_store_text(&ctx->last_emit_text, txt);
-+    ctx->last_real_time = pts;
-+    ctx->screen_touched = 0;
-+    return 0;
-+}
-+
-+static int cc608_emit_final_text(AVCodecContext *avctx, AVSubtitle *sub,
-+                                 unsigned *nb_rect_allocated,
-+                                 const char *txt, int64_t pts, int64_t duration)
-+{
-+    CCaptionSubContext *ctx = avctx->priv_data;
-+    int ret;
-+
-+    if (!cc608_has_meaningful_text(txt)) {
-+        CCLOG("EMIT_SKIP_EMPTY pts=%lld\n", (long long)pts);
-+        return 0;
-+    }
- 
-+    sub->pts = pts;
-+    sub->end_display_time = duration;
-+
-+    CCLOG("EMIT_ACCEPT pts=%lld text=%s\n", (long long)pts, txt);
-+
-+    ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, nb_rect_allocated);
-+    if (ret < 0)
-+        return ret;
-+
-+    cc608_store_text(&ctx->last_emit_text, txt);
-+    ctx->last_real_time = pts;
-+    ctx->screen_touched = 0;
-+    return 0;
-+}
-+
-+
-+static av_cold int init_decoder(AVCodecContext *avctx)
-+{
-+    CCaptionSubContext *ctx = avctx->priv_data;
+-
      ctx->logctx = avctx;
 +    ctx->data_field = -1;
 +    ctx->debug_pairs_logged = 0;
 +    ctx->last_emit_text = NULL;
 +    ctx->last_seen_text = NULL;
 +    ctx->last_seen_pts = AV_NOPTS_VALUE;
-+    ctx->pending_text = NULL;
-+    ctx->pending_pts = AV_NOPTS_VALUE;
  
      av_bprint_init(&ctx->buffer[0], 0, AV_BPRINT_SIZE_UNLIMITED);
      av_bprint_init(&ctx->buffer[1], 0, AV_BPRINT_SIZE_UNLIMITED);
@@ -334,17 +214,16 @@ index 9b6c766d87..30e03f0238 100644
      return ff_ass_subtitle_header(avctx, "Monospace",
                                   ASS_DEFAULT_FONT_SIZE,
                                   ASS_DEFAULT_COLOR,
-@@ -307,6 +484,9 @@ static av_cold int close_decoder(AVCodecContext *avctx)
+@@ -307,6 +362,8 @@ static av_cold int close_decoder(AVCodecContext *avctx)
      CCaptionSubContext *ctx = avctx->priv_data;
      av_bprint_finalize(&ctx->buffer[0], NULL);
      av_bprint_finalize(&ctx->buffer[1], NULL);
 +    av_freep(&ctx->last_emit_text);
 +    av_freep(&ctx->last_seen_text);
-+    av_freep(&ctx->pending_text);
      return 0;
  }
  
-@@ -329,23 +509,29 @@ static av_cold void flush_decoder(AVCodecContext *avctx)
+@@ -329,23 +386,28 @@ static av_cold void flush_decoder(AVCodecContext *avctx)
      ctx->last_real_time = 0;
      ctx->screen_touched = 0;
      ctx->buffer_changed = 0;
@@ -352,13 +231,12 @@ index 9b6c766d87..30e03f0238 100644
 +    ctx->debug_pairs_logged = 0;
 +    av_freep(&ctx->last_emit_text);
 +    av_freep(&ctx->last_seen_text);
-+    av_freep(&ctx->pending_text);
 +    ctx->last_seen_pts = AV_NOPTS_VALUE;
-+    ctx->pending_pts = AV_NOPTS_VALUE;
      if (!(avctx->flags2 & AV_CODEC_FLAG2_RO_FLUSH_NOOP))
          ctx->readorder = 0;
      av_bprint_clear(&ctx->buffer[0]);
      av_bprint_clear(&ctx->buffer[1]);
++    av_freep(&ctx->last_emit_text);
 +
 +    CCLOG("cc608 flush_decoder reset data_field=%d\n", ctx->data_field);
  }
@@ -382,7 +260,7 @@ index 9b6c766d87..30e03f0238 100644
  
      if (col < SCREEN_COLUMNS) {
          row[col] = ch;
-@@ -354,55 +540,54 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
+@@ -354,55 +416,54 @@ static void write_char(CCaptionSubContext *ctx, struct Screen *screen, char ch)
          bg[col] = ctx->bg_color;
          charset[col] = ctx->cursor_charset;
          ctx->cursor_charset = CCSET_BASIC_AMERICAN;
@@ -459,7 +337,7 @@ index 9b6c766d87..30e03f0238 100644
  
      return 0;
  }
-@@ -411,15 +596,12 @@ static struct Screen *get_writing_screen(CCaptionSubContext *ctx)
+@@ -411,15 +472,12 @@ static struct Screen *get_writing_screen(CCaptionSubContext *ctx)
  {
      switch (ctx->mode) {
      case CCMODE_POPON:
@@ -475,7 +353,7 @@ index 9b6c766d87..30e03f0238 100644
      return NULL;
  }
  
-@@ -432,10 +614,6 @@ static void roll_up(CCaptionSubContext *ctx)
+@@ -432,10 +490,6 @@ static void roll_up(CCaptionSubContext *ctx)
          return;
  
      screen = get_writing_screen(ctx);
@@ -486,7 +364,7 @@ index 9b6c766d87..30e03f0238 100644
      keep_lines = FFMIN(ctx->cursor_row + 1, ctx->rollup);
  
      for (i = 0; i < SCREEN_ROWS; i++) {
-@@ -470,11 +648,10 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -470,11 +524,10 @@ static int capture_screen(CCaptionSubContext *ctx)
  
      av_bprint_clear(&ctx->buffer[bidx]);
  
@@ -501,7 +379,7 @@ index 9b6c766d87..30e03f0238 100644
              j = 0;
              while (row[j] == ' ' && charset[j] == CCSET_BASIC_AMERICAN)
                  j++;
-@@ -483,25 +660,21 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -483,25 +536,21 @@ static int capture_screen(CCaptionSubContext *ctx)
          }
      }
  
@@ -535,7 +413,7 @@ index 9b6c766d87..30e03f0238 100644
  
              for (; j < SCREEN_COLUMNS; j++) {
                  const char *e_tag = "", *s_tag = "", *c_tag = "", *b_tag = "";
-@@ -511,79 +684,43 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -511,79 +560,43 @@ static int capture_screen(CCaptionSubContext *ctx)
  
                  if (prev_font != font[j]) {
                      switch (prev_font) {
@@ -642,7 +520,7 @@ index 9b6c766d87..30e03f0238 100644
                      }
                  }
  
-@@ -591,6 +728,7 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -591,6 +604,7 @@ static int capture_screen(CCaptionSubContext *ctx)
                  prev_color = color[j];
                  prev_bg_color = bg[j];
                  override = charset_overrides[(int)charset[j]][(int)row[j]];
@@ -650,7 +528,7 @@ index 9b6c766d87..30e03f0238 100644
                  if (override[0]) {
                      av_bprintf(&ctx->buffer[bidx], "%s%s%s%s%s", e_tag, s_tag, c_tag, b_tag, override);
                      seen_char = 1;
-@@ -600,17 +738,19 @@ static int capture_screen(CCaptionSubContext *ctx)
+@@ -600,17 +614,19 @@ static int capture_screen(CCaptionSubContext *ctx)
                      av_bprintf(&ctx->buffer[bidx], "%s%s%s%s%c", e_tag, s_tag, c_tag, b_tag, row[j]);
                      seen_char = 1;
                  }
@@ -671,7 +549,41 @@ index 9b6c766d87..30e03f0238 100644
      ctx->buffer_changed = 1;
      return 0;
  }
-@@ -624,7 +764,6 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+@@ -621,10 +637,40 @@ static void update_time(CCaptionSubContext *ctx, int64_t pts)
+     ctx->buffer_time[1] = pts;
+ }
+ 
++static int cc608_store_text(char **dst, const char *src)
++{
++    char *tmp;
++
++    if (!src)
++        src = "";
++
++    tmp = av_strdup(src);
++    if (!tmp)
++        return AVERROR(ENOMEM);
++
++    av_freep(dst);
++    *dst = tmp;
++    return 0;
++}
++
++static int cc608_emit_text(AVSubtitle *sub, unsigned *nb_rect_allocated,
++                           CCaptionSubContext *ctx, const char *txt)
++{
++    int ret;
++
++    if (!txt || !txt[0])
++        return 0;
++
++    ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, nb_rect_allocated);
++    if (ret < 0)
++        return ret;
++
++    return cc608_store_text(&ctx->last_emit_text, txt);
++}
++
  static void handle_bgattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
      const int i = (lo & 0xf) >> 1;
@@ -679,7 +591,7 @@ index 9b6c766d87..30e03f0238 100644
      ctx->bg_color = bg_attribs[i];
  }
  
-@@ -645,10 +784,8 @@ static void handle_textattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
+@@ -645,10 +691,8 @@ static void handle_textattr(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  
  static void handle_pac(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
  {
@@ -692,7 +604,7 @@ index 9b6c766d87..30e03f0238 100644
      struct Screen *screen = get_writing_screen(ctx);
      int indent, i;
  
-@@ -658,16 +795,15 @@ static void handle_pac(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
+@@ -658,16 +702,15 @@ static void handle_pac(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
      }
  
      lo &= 0x1f;
@@ -712,7 +624,7 @@ index 9b6c766d87..30e03f0238 100644
  }
  
  static int handle_edm(CCaptionSubContext *ctx)
-@@ -675,16 +811,12 @@ static int handle_edm(CCaptionSubContext *ctx)
+@@ -675,16 +718,12 @@ static int handle_edm(CCaptionSubContext *ctx)
      struct Screen *screen = ctx->screen + ctx->active_screen;
      int ret;
  
@@ -729,7 +641,7 @@ index 9b6c766d87..30e03f0238 100644
      if (ctx->real_time)
          ret = capture_screen(ctx);
  
-@@ -697,15 +829,11 @@ static int handle_eoc(CCaptionSubContext *ctx)
+@@ -697,15 +736,11 @@ static int handle_eoc(CCaptionSubContext *ctx)
  
      ctx->active_screen = !ctx->active_screen;
  
@@ -745,7 +657,7 @@ index 9b6c766d87..30e03f0238 100644
      if (ctx->real_time)
          ret = capture_screen(ctx);
  
-@@ -725,63 +853,65 @@ static void handle_char(CCaptionSubContext *ctx, char hi, char lo)
+@@ -725,63 +760,65 @@ static void handle_char(CCaptionSubContext *ctx, char hi, char lo)
      SET_FLAG(screen->row_used, ctx->cursor_row);
  
      switch (hi) {
@@ -825,7 +737,7 @@ index 9b6c766d87..30e03f0238 100644
              ctx->mode = CCMODE_POPON;
              break;
          case 0x24:
-@@ -794,19 +924,15 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
+@@ -794,19 +831,15 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
              ctx->mode = CCMODE_ROLLUP;
              break;
          case 0x29:
@@ -845,7 +757,7 @@ index 9b6c766d87..30e03f0238 100644
              ff_dlog(ctx->logctx, "carriage return\n");
              if (!ctx->real_time)
                  ret = capture_screen(ctx);
-@@ -814,16 +940,12 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
+@@ -814,16 +847,12 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
              ctx->cursor_column = 0;
              break;
          case 0x2e:
@@ -862,7 +774,7 @@ index 9b6c766d87..30e03f0238 100644
              ff_dlog(ctx->logctx, "handle_eoc\n");
              ret = handle_eoc(ctx);
              break;
-@@ -832,20 +954,15 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
+@@ -832,20 +861,15 @@ static int process_cc608(CCaptionSubContext *ctx, uint8_t hi, uint8_t lo)
              break;
          }
      } else if (hi >= 0x11 && hi <= 0x13) {
@@ -884,13 +796,11 @@ index 9b6c766d87..30e03f0238 100644
          ff_dlog(ctx->logctx, "Unknown command 0x%hhx 0x%hhx\n", hi, lo);
      }
  
-@@ -866,24 +983,87 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
-     int i;
+@@ -867,23 +891,86 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      unsigned nb_rect_allocated = 0;
  
--    for (i = 0; i < len; i += 3) {
+     for (i = 0; i < len; i += 3) {
 -        uint8_t hi, cc_type = bptr[i] & 1;
-+    for (i = 0; i + 2 < len; i += 3) {
 +        uint8_t hi;
 +        uint8_t cc_type = bptr[i] & 3;
 +        uint8_t field   = cc_type & 1;
@@ -977,12 +887,13 @@ index 9b6c766d87..30e03f0238 100644
          ctx->buffer_changed = 0;
  
          if (!ctx->real_time && ctx->mode == CCMODE_POPON)
-@@ -892,48 +1072,107 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -892,48 +979,102 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          update_time(ctx, in_time);
  
          if (ctx->buffer[bidx].str[0] || ctx->real_time) {
 -            ff_dlog(avctx, "cdp writing data (%s)\n", ctx->buffer[bidx].str);
 +            const char *txt = ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "";
++            int suppress_emit = 0;
 +
 +            ff_dlog(avctx, "cdp writing data (%s)\n", txt);
              start_time = ctx->buffer_time[0];
@@ -999,121 +910,107 @@ index 9b6c766d87..30e03f0238 100644
 -            ctx->last_real_time = sub->pts;
 -            ctx->screen_touched = 0;
 +
-+            if (!ctx->real_time) {
-+                int64_t duration = av_rescale_q(end_time - start_time, AV_TIME_BASE_Q, ms_tb);
-+                ret = cc608_emit_final_text(avctx, sub, &nb_rect_allocated, txt, sub->pts, duration);
++            if (ctx->real_time) {
++                if (ctx->last_emit_text && strcmp(ctx->last_emit_text, txt) == 0) {
++                    suppress_emit = 1;
++                    CCLOG("EMIT_SUPPRESS_DUP pts=%lld text=%s\n",
++                          (long long)sub->pts, txt);
++                } else if (cc608_is_prefix_growth(ctx->last_seen_text, txt) &&
++                           ctx->last_seen_pts != AV_NOPTS_VALUE &&
++                           sub->pts - ctx->last_seen_pts <= av_rescale_q(700, ms_tb, AV_TIME_BASE_Q)) {
++                    suppress_emit = 1;
++                    CCLOG("EMIT_SUPPRESS_PREFIX_GROWTH pts=%lld prev=%s text=%s\n",
++                          (long long)sub->pts,
++                          ctx->last_seen_text ? ctx->last_seen_text : "",
++                          txt);
++                }
++            }
++
++            cc608_store_text(&ctx->last_seen_text, txt);
++            ctx->last_seen_pts = sub->pts;
++
++            if (!suppress_emit) {
++                if (!ctx->real_time)
++                    sub->end_display_time = av_rescale_q(end_time - start_time, AV_TIME_BASE_Q, ms_tb);
++                else
++                    sub->end_display_time = -1;
++
++                CCLOG("EMIT_ACCEPT pts=%lld text=%s\n",
++                      (long long)sub->pts, txt);
++
++                ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
 +                if (ret < 0)
 +                    return ret;
-+            } else {
-+                cc608_store_text(&ctx->last_seen_text, txt);
-+                ctx->last_seen_pts = sub->pts;
 +
-+                if (!cc608_has_meaningful_text(txt)) {
-+                    CCLOG("RT_SKIP_EMPTY pts=%lld\n", (long long)sub->pts);
-+
-+                    if (ctx->pending_text &&
-+                        cc608_should_emit_pending(ctx->pending_text, NULL, ctx->last_emit_text)) {
-+                        ret = cc608_emit_realtime_text(avctx, sub, &nb_rect_allocated,
-+                                                       ctx->pending_text, ctx->pending_pts);
-+                        if (ret < 0)
-+                            return ret;
-+                        CCLOG("RT_EMPTY_FLUSH pts=%lld text=%s\n",
-+                              (long long)ctx->pending_pts, ctx->pending_text);
-+                    } else if (ctx->pending_text) {
-+                        CCLOG("RT_EMPTY_CLEAR pts=%lld text=%s\n",
-+                              (long long)ctx->pending_pts,
-+                              ctx->pending_text ? ctx->pending_text : "");
-+                    }
-+
-+                    av_freep(&ctx->pending_text);
-+                    ctx->pending_pts = AV_NOPTS_VALUE;
-+                    ctx->screen_touched = 0;
-+                } else if (!ctx->pending_text) {
-+                    cc608_store_text(&ctx->pending_text, txt);
-+                    ctx->pending_pts = sub->pts;
-+                    CCLOG("RT_PENDING_STORE pts=%lld text=%s\n",
-+                          (long long)ctx->pending_pts, txt);
-+                } else if (strcmp(ctx->pending_text, txt) == 0) {
-+                    CCLOG("RT_PENDING_SAME pts=%lld text=%s\n",
-+                          (long long)sub->pts, txt);
-+                } else {
-+                    if (cc608_should_emit_pending(ctx->pending_text, txt, ctx->last_emit_text)) {
-+                        ret = cc608_emit_realtime_text(avctx, sub, &nb_rect_allocated,
-+                                                       ctx->pending_text, ctx->pending_pts);
-+                        if (ret < 0)
-+                            return ret;
-+                        CCLOG("RT_PENDING_FLUSH pts=%lld text=%s\n",
-+                              (long long)ctx->pending_pts,
-+                              ctx->pending_text ? ctx->pending_text : "");
-+                    } else {
-+                        CCLOG("RT_PENDING_DROP pts=%lld text=%s next=%s\n",
-+                              (long long)ctx->pending_pts,
-+                              ctx->pending_text ? ctx->pending_text : "",
-+                              txt);
-+                    }
-+
-+                    cc608_store_text(&ctx->pending_text, txt);
-+                    ctx->pending_pts = sub->pts;
-+                    CCLOG("RT_PENDING_REPLACE pts=%lld text=%s\n",
-+                          (long long)ctx->pending_pts, txt);
-+                }
++                cc608_store_text(&ctx->last_emit_text, txt);
++                ctx->last_real_time = sub->pts;
++                ctx->screen_touched = 0;
 +            }
          }
      }
  
      if (!bptr && !ctx->real_time && ctx->buffer[!ctx->buffer_index].str[0]) {
-+        int64_t duration;
          bidx = !ctx->buffer_index;
 -        ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
-+        duration = av_rescale_q(ctx->buffer_time[1] - ctx->buffer_time[0], AV_TIME_BASE_Q, ms_tb);
-+        if (duration == 0)
-+            duration = ctx->buffer[bidx].len * 20;
-+        ret = cc608_emit_final_text(avctx, sub, &nb_rect_allocated,
-+                                    ctx->buffer[bidx].str, ctx->buffer_time[1], duration);
++        ret = cc608_emit_text(sub, &nb_rect_allocated, ctx, ctx->buffer[bidx].str);
          if (ret < 0)
              return ret;
          av_bprint_clear(&ctx->buffer[bidx]);
--        sub->pts = ctx->buffer_time[1];
+         sub->pts = ctx->buffer_time[1];
 -        sub->end_display_time = av_rescale_q(ctx->buffer_time[1] - ctx->buffer_time[0],
 -                                             AV_TIME_BASE_Q, ms_tb);
--        if (sub->end_display_time == 0)
--            sub->end_display_time = ctx->buffer[bidx].len * 20;
++        sub->end_display_time = av_rescale_q(ctx->buffer_time[1] - ctx->buffer_time[0], AV_TIME_BASE_Q, ms_tb);
+         if (sub->end_display_time == 0)
+             sub->end_display_time = ctx->buffer[bidx].len * 20;
      }
  
--    if (ctx->real_time && ctx->screen_touched &&
--        sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
+     if (ctx->real_time && ctx->screen_touched &&
+         sub->pts >= ctx->last_real_time + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
 -        ctx->last_real_time = sub->pts;
 -        ctx->screen_touched = 0;
--
--        capture_screen(ctx);
--        ctx->buffer_changed = 0;
-+    if (ctx->real_time && ctx->pending_text && ctx->pending_text[0] &&
-+        ctx->pending_pts != AV_NOPTS_VALUE && in_time != AV_NOPTS_VALUE &&
-+        in_time >= ctx->pending_pts + av_rescale_q(ctx->real_time_latency_msec, ms_tb, AV_TIME_BASE_Q)) {
-+        if (cc608_should_emit_pending(ctx->pending_text, NULL, ctx->last_emit_text)) {
-+            ret = cc608_emit_realtime_text(avctx, sub, &nb_rect_allocated,
-+                                           ctx->pending_text, ctx->pending_pts);
-+            if (ret < 0)
-+                return ret;
-+            CCLOG("RT_TIMEOUT_FLUSH pts=%lld text=%s\n",
-+                  (long long)ctx->pending_pts,
-+                  ctx->pending_text ? ctx->pending_text : "");
-+        } else {
-+            CCLOG("RT_TIMEOUT_DROP pts=%lld text=%s\n",
-+                  (long long)ctx->pending_pts,
-+                  ctx->pending_text ? ctx->pending_text : "");
++        const char *txt;
++        int suppress_emit = 0;
+ 
+         capture_screen(ctx);
+         ctx->buffer_changed = 0;
++        txt = ctx->buffer[bidx].str ? ctx->buffer[bidx].str : "";
++
++        if (ctx->last_emit_text && strcmp(ctx->last_emit_text, txt) == 0) {
++            suppress_emit = 1;
++            CCLOG("RT_SUPPRESS_DUP pts=%lld text=%s\n",
++                  (long long)sub->pts, txt);
++        } else if (cc608_is_prefix_growth(ctx->last_seen_text, txt) &&
++                   ctx->last_seen_pts != AV_NOPTS_VALUE &&
++                   sub->pts - ctx->last_seen_pts <= av_rescale_q(700, ms_tb, AV_TIME_BASE_Q)) {
++            suppress_emit = 1;
++            CCLOG("RT_SUPPRESS_PREFIX_GROWTH pts=%lld prev=%s text=%s\n",
++                  (long long)sub->pts,
++                  ctx->last_seen_text ? ctx->last_seen_text : "",
++                  txt);
 +        }
  
 -        ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
 -        if (ret < 0)
 -            return ret;
 -        sub->end_display_time = -1;
-+        av_freep(&ctx->pending_text);
-+        ctx->pending_pts = AV_NOPTS_VALUE;
++        cc608_store_text(&ctx->last_seen_text, txt);
++        ctx->last_seen_pts = sub->pts;
++
++        if (!suppress_emit) {
++            ctx->last_real_time = sub->pts;
++            ctx->screen_touched = 0;
++            CCLOG("RT_EMIT_ACCEPT pts=%lld text=%s\n",
++                  (long long)sub->pts, txt);
++            ret = ff_ass_add_rect2(sub, txt, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
++            if (ret < 0)
++                return ret;
++            sub->end_display_time = -1;
++            cc608_store_text(&ctx->last_emit_text, txt);
++        }
      }
  
      *got_sub = sub->num_rects > 0;
-@@ -946,10 +1185,10 @@ static const AVOption options[] = {
+@@ -946,10 +1087,10 @@ static const AVOption options[] = {
      { "real_time", "emit subtitle events as they are decoded for real-time display", OFFSET(real_time), AV_OPT_TYPE_BOOL, { .i64 = 0 }, 0, 1, SD },
      { "real_time_latency_msec", "minimum elapsed time between emitting real-time subtitle events", OFFSET(real_time_latency_msec), AV_OPT_TYPE_INT, { .i64 = 200 }, 0, 500, SD },
      { "data_field", "select data field", OFFSET(data_field), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, SD, .unit = "data_field" },
