@@ -14,6 +14,23 @@ ExternalProject_Add(xvidcore
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
 )
 
+ExternalProject_Add_Step(xvidcore patch-bool
+    DEPENDEES download update
+    DEPENDERS autoconf
+    COMMAND ${EXEC} python - <<'PY'
+from pathlib import Path
+p = Path("<SOURCE_DIR>/src/encoder.h")
+txt = p.read_text(encoding="utf-8", errors="ignore")
+old = "typedef int bool;"
+new = "#include <stdbool.h>\\n/* patched for modern clang */"
+if old in txt:
+    txt = txt.replace(old, new, 1)
+p.write_text(txt, encoding="utf-8")
+PY
+    WORKING_DIRECTORY <SOURCE_DIR>
+    LOG 1
+)
+
 ExternalProject_Add_Step(xvidcore autoconf
     DEPENDEES download update patch
     DEPENDERS configure
