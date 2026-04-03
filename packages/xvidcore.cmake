@@ -3,7 +3,7 @@ ExternalProject_Add(xvidcore
     URL_HASH SHA256=aeeaae952d4db395249839a3bd03841d6844843f5a4f84c271ff88f7aa1acff7
     DOWNLOAD_DIR ${SOURCE_LOCATION}
     PATCH_COMMAND /bin/sh -c "cd <SOURCE_DIR> && python -c \"from pathlib import Path; p = Path('src/encoder.h'); txt = p.read_text(encoding='utf-8', errors='ignore'); txt = txt.replace('typedef int bool;', '#include <stdbool.h>\\n/* patched for modern clang */', 1); p.write_text(txt, encoding='utf-8')\" && patch -p0 < \"${CMAKE_CURRENT_SOURCE_DIR}/xvidcore-2-win64.patch\""
-    CONFIGURE_COMMAND ${EXEC} cd <SOURCE_DIR>/build/generic && CONF=1 ./configure
+    CONFIGURE_COMMAND ${EXEC} cd <SOURCE_DIR>/build/generic && autoconf && CONF=1 ./configure
         --host=${TARGET_ARCH}
         --prefix=${MINGW_INSTALL_PREFIX}
     BUILD_COMMAND ${MAKE} -C build/generic BUILD_DIR=build SHARED_LIB=
@@ -12,15 +12,12 @@ ExternalProject_Add(xvidcore
         COMMAND install -d ${MINGW_INSTALL_PREFIX}/lib
         COMMAND install -m644 build/generic/build/xvidcore.a ${MINGW_INSTALL_PREFIX}/lib/libxvidcore.a
     BUILD_IN_SOURCE 1
-    LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_PATCH 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
-)
-
-ExternalProject_Add_Step(xvidcore autoconf
-    DEPENDEES patch
-    DEPENDERS configure
-    COMMAND ${EXEC} autoconf
-    WORKING_DIRECTORY <SOURCE_DIR>/build/generic
-    LOG 1
+    LOG_DOWNLOAD 1
+    LOG_UPDATE 1
+    LOG_PATCH 1
+    LOG_CONFIGURE 1
+    LOG_BUILD 1
+    LOG_INSTALL 1
 )
 
 cleanup(xvidcore install)
