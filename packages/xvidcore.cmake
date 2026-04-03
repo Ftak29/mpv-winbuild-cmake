@@ -27,7 +27,7 @@ if(${TARGET_CPU} MATCHES "x86_64")
     ExternalProject_Add_Step(xvidcore win64-fix
         DEPENDEES download update patch
         DEPENDERS autoconf
-        COMMAND sh -c "patch -p0 < '${CMAKE_CURRENT_SOURCE_DIR}/xvidcore-2-win64.patch'"
+        COMMAND /bin/sh -c "patch -p0 < \"${CMAKE_CURRENT_SOURCE_DIR}/xvidcore-2-win64.patch\""
         WORKING_DIRECTORY <SOURCE_DIR>
         LOG 1
     )
