@@ -1,3 +1,5 @@
+message(FATAL_ERROR "XVIDCORE_FILE_MARKER_123")
+
 ExternalProject_Add(xvidcore
     URL "https://downloads.xvid.com/downloads/xvidcore-1.3.7.tar.bz2"
     URL_HASH SHA256=aeeaae952d4db395249839a3bd03841d6844843f5a4f84c271ff88f7aa1acff7
