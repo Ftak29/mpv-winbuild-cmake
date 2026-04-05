@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..a593bebe99 100644
+index 9b6c766d87..a382b292e8 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,11 +20,33 @@
@@ -934,7 +934,7 @@ index 9b6c766d87..a593bebe99 100644
          }
      }
  
-@@ -916,24 +1019,27 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -916,24 +1019,26 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
              return ret;
          av_bprint_clear(&ctx->buffer[bidx]);
          sub->pts = ctx->buffer_time[1];
@@ -959,8 +959,7 @@ index 9b6c766d87..a593bebe99 100644
 -        if (ret < 0)
 -            return ret;
 -        sub->end_display_time = -1;
-+        CCLOG("B2_RT_SUPPRESS pts=%lld text=%s
-+",
++        CCLOG("B2_RT_SUPPRESS pts=%lld text=%s\n",
 +              (long long)sub->pts, txt);
 +
 +        cc608_store_text(&ctx->rt_prev_text, txt);
@@ -970,7 +969,7 @@ index 9b6c766d87..a593bebe99 100644
      }
  
      *got_sub = sub->num_rects > 0;
-@@ -943,13 +1049,13 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -943,13 +1048,13 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
  #define OFFSET(x) offsetof(CCaptionSubContext, x)
  #define SD AV_OPT_FLAG_SUBTITLE_PARAM | AV_OPT_FLAG_DECODING_PARAM
  static const AVOption options[] = {
