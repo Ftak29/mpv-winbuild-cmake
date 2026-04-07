@@ -1,5 +1,5 @@
 diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
-index 9b6c766d87..a75b3f0dc9 100644
+index 9b6c766d87..d7a089824c 100644
 --- a/libavcodec/ccaption_dec.c
 +++ b/libavcodec/ccaption_dec.c
 @@ -20,11 +20,41 @@
@@ -48,12 +48,12 @@ index 9b6c766d87..a75b3f0dc9 100644
  
  static const AVRational ms_tb = {1, 1000};
  
-+static int64_t g_last_cc_text_ms = 0;
++static int64_t g_last_cc_activity_ms = 0;
 +
 +CC608_EXPORT int getCc608Status(void)
 +{
 +    int64_t now = av_gettime_relative() / 1000;
-+    return (g_last_cc_text_ms > 0 && (now - g_last_cc_text_ms) < 2000) ? 1 : 0;
++    return (g_last_cc_activity_ms > 0 && (now - g_last_cc_activity_ms) < 2000) ? 1 : 0;
 +}
 +
  enum cc_mode {
@@ -228,8 +228,8 @@ index 9b6c766d87..a75b3f0dc9 100644
      ctx->rollup = 2;
      ctx->cursor_row = 10;
 +
-+    g_last_cc_text_ms = 0;
-+    CCLOG("BUILD_MARKER=FINAL_B1 data_field=%d\n", ctx->data_field);
++    g_last_cc_activity_ms = 0;
++    CCLOG("BUILD_MARKER=FINAL_B1_PAYLOAD data_field=%d\n", ctx->data_field);
 +
      return ff_ass_subtitle_header(avctx, "Monospace",
                                   ASS_DEFAULT_FONT_SIZE,
@@ -257,7 +257,7 @@ index 9b6c766d87..a75b3f0dc9 100644
      av_bprint_clear(&ctx->buffer[0]);
      av_bprint_clear(&ctx->buffer[1]);
 +
-+    g_last_cc_text_ms = 0;
++    g_last_cc_activity_ms = 0;
 +    CCLOG("cc608 flush_decoder reset data_field=%d\n", ctx->data_field);
  }
  
@@ -785,7 +785,7 @@ index 9b6c766d87..a75b3f0dc9 100644
          ff_dlog(ctx->logctx, "Unknown command 0x%hhx 0x%hhx\n", hi, lo);
      }
  
-@@ -867,23 +876,86 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -867,23 +876,88 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
      unsigned nb_rect_allocated = 0;
  
      for (i = 0; i < len; i += 3) {
@@ -856,6 +856,8 @@ index 9b6c766d87..a75b3f0dc9 100644
 +            CCLOG("cc608 process hi=%02X lo=%02X field=%d mode=%d row=%d col=%d data_field=%d\n",
 +                  hi & 0x7F, bptr[i + 2] & 0x7F, field, ctx->mode, ctx->cursor_row, ctx->cursor_column, ctx->data_field);
 +        }
++
++        g_last_cc_activity_ms = av_gettime_relative() / 1000;
  
          ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
          if (ret < 0)
@@ -876,7 +878,7 @@ index 9b6c766d87..a75b3f0dc9 100644
          ctx->buffer_changed = 0;
  
          if (!ctx->real_time && ctx->mode == CCMODE_POPON)
-@@ -892,20 +964,54 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -892,20 +966,50 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
          update_time(ctx, in_time);
  
          if (ctx->buffer[bidx].str[0] || ctx->real_time) {
@@ -931,10 +933,6 @@ index 9b6c766d87..a75b3f0dc9 100644
 +                if (ret < 0)
 +                    return ret;
 +
-+                if (txt && txt[0]) {
-+                    g_last_cc_text_ms = av_gettime_relative() / 1000;
-+                }
-+
 +                cc608_store_text(&ctx->last_emit_text, txt);
 +                ctx->last_real_time = sub->pts;
 +                ctx->screen_touched = 0;
@@ -942,15 +940,8 @@ index 9b6c766d87..a75b3f0dc9 100644
          }
      }
  
-@@ -914,26 +1020,29 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
-         ret = ff_ass_add_rect2(sub, ctx->buffer[bidx].str, ctx->readorder++, 0, NULL, NULL, &nb_rect_allocated);
-         if (ret < 0)
+@@ -916,24 +1020,22 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
              return ret;
-+
-+        if (ctx->buffer[bidx].str && ctx->buffer[bidx].str[0]) {
-+            g_last_cc_text_ms = av_gettime_relative() / 1000;
-+        }
-+
          av_bprint_clear(&ctx->buffer[bidx]);
          sub->pts = ctx->buffer_time[1];
 -        sub->end_display_time = av_rescale_q(ctx->buffer_time[1] - ctx->buffer_time[0],
@@ -982,7 +973,7 @@ index 9b6c766d87..a75b3f0dc9 100644
      }
  
      *got_sub = sub->num_rects > 0;
-@@ -943,13 +1052,13 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
+@@ -943,13 +1045,13 @@ static int decode(AVCodecContext *avctx, AVSubtitle *sub,
  #define OFFSET(x) offsetof(CCaptionSubContext, x)
  #define SD AV_OPT_FLAG_SUBTITLE_PARAM | AV_OPT_FLAG_DECODING_PARAM
  static const AVOption options[] = {
