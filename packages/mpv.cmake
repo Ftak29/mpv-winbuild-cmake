@@ -33,23 +33,23 @@ ExternalProject_Add(mpv
         ffmpeg
         fribidi
         lcms2
-        libarchive
-        libass
-        libdvdnav
-        libdvdread
-        libiconv
-        libjpeg
-        libpng
+        archive
+        ass
+        dvdnav
+        dvdread
+        iconv
+        jpeg
+        png
         luajit
         rubberband
         uchardet
         mujs
         vulkan
         shaderc
-        libplacebo
+        placebo
         spirv-cross
         vapoursynth
-        libsdl2
+        sdl2
         subrandr
     GIT_REPOSITORY https://github.com/mpv-player/mpv.git
     GIT_TAG v0.41.0
@@ -87,7 +87,7 @@ ExternalProject_Add(mpv
     PATCH_COMMAND
       ${CMAKE_COMMAND} -E env
         MPV_SOURCE_DIR=<SOURCE_DIR>
-        EZTV_LIB_VER=EzTvLibWin-1.0.1
+        TVEZ_LIB_VER=TVEZLibWin-1.1
       /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh          
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
