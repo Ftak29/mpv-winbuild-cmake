@@ -34,7 +34,7 @@ ExternalProject_Add(mpv-release
     PATCH_COMMAND
       ${CMAKE_COMMAND} -E env
         MPV_SOURCE_DIR=<SOURCE_DIR>
-        EZTV_LIB_VER=TvEz-1.0
+        TVEZ_LIB_VER=TVEZLibW-1.1
         /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh
         
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
