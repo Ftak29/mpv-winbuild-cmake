@@ -33,23 +33,23 @@ ExternalProject_Add(mpv
         ffmpeg
         fribidi
         lcms2
-        archive
-        ass
-        dvdnav
-        dvdread
-        iconv
-        jpeg
-        png
+        libarchive
+        libass
+        libdvdnav
+        libdvdread
+        libiconv
+        libjpeg
+        libpng
         luajit
         rubberband
         uchardet
         mujs
         vulkan
         shaderc
-        placebo
+        libplacebo
         spirv-cross
         vapoursynth
-        sdl2
+        libsdl2
         subrandr
     GIT_REPOSITORY https://github.com/mpv-player/mpv.git
     GIT_TAG v0.41.0
