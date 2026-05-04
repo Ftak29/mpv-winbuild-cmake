@@ -54,8 +54,8 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          ref: master      
-
+          ref: ${{ github.ref }}
+          
       - name: Loading clang sysroot cache
         uses: actions/cache/restore@v4
         with:
@@ -87,9 +87,11 @@ jobs:
 
       - name: Upgrade Meson
         run: |
-          python -m pip install --user --upgrade "meson>=1.11.0"
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-          meson --version
+          python -m venv "$PWD/meson-venv"
+          "$PWD/meson-venv/bin/python" -m pip install --upgrade pip
+          "$PWD/meson-venv/bin/python" -m pip install "meson>=1.11.0"
+          echo "$PWD/meson-venv/bin" >> $GITHUB_PATH
+          "$PWD/meson-venv/bin/meson" --version          
           
       - name: Configuring CMake & Downloading source
         run: |
