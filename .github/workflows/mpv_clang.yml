@@ -52,12 +52,12 @@ jobs:
           git config --global fetch.prune true
           git config --global --add safe.directory $PWD
 
-      - uses: actions/checkout@main
+      - uses: actions/checkout@v4
         with:
           ref: master      
 
       - name: Loading clang sysroot cache
-        uses: actions/cache/restore@main
+        uses: actions/cache/restore@v4
         with:
           path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
@@ -65,7 +65,7 @@ jobs:
             ${{ secrets.CACHE_VERSION }}-clang_root
 
       - name: Loading repository cache
-        uses: actions/cache/restore@main
+        uses: actions/cache/restore@v4
         with:
           path: src_packages
           key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
@@ -73,7 +73,7 @@ jobs:
             ${{ secrets.CACHE_VERSION }}-repository
 
       - name: Loading ${{ matrix.bit }} toolchain cache
-        uses: actions/cache/restore@main
+        uses: actions/cache/restore@v4
         with:
           path: build_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
@@ -85,6 +85,12 @@ jobs:
         continue-on-error: true
         run: ${{ github.event.inputs.command }}
 
+      - name: Upgrade Meson
+        run: |
+          python -m pip install --user --upgrade "meson>=1.11.0"
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          meson --version
+          
       - name: Configuring CMake & Downloading source
         run: |
           cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 \
@@ -140,13 +146,13 @@ jobs:
              ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
       - name: Uploading ${{ matrix.bit }} dev
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: mpv-${{ matrix.bit }}-dev
           path: release_${{ matrix.bit }}/mpv-dev-*
 
       - name: Uploading ${{ matrix.bit }} dev
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: mpv-${{ matrix.bit }}-dev
           path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
@@ -158,7 +164,7 @@ jobs:
           rm -rf release_$BIT/mpv-dev*.7z
 
       - name: Saving release_${{ matrix.bit }} cache
-        uses: actions/cache/save@main
+        uses: actions/cache/save@v4
         with:
           path: release_${{ matrix.bit }}
           key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
