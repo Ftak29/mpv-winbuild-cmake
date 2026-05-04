@@ -53,8 +53,6 @@ jobs:
           git config --global --add safe.directory $PWD
 
       - uses: actions/checkout@main
-        with:
-          ref: master
 
       - name: Loading clang sysroot cache
         uses: actions/cache/restore@main
@@ -140,13 +138,13 @@ jobs:
              ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
 
       - name: Uploading ${{ matrix.bit }} dev
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: mpv-${{ matrix.bit }}-dev
           path: release_${{ matrix.bit }}/mpv-dev-*
 
       - name: Uploading ${{ matrix.bit }} dev
-        uses: actions/upload-artifact@master
+        uses: actions/upload-artifact@v4
         with:
           name: mpv-${{ matrix.bit }}-dev
           path: release_${{ matrix.bit }}/mpv-dev-${{ env.arch }}*
