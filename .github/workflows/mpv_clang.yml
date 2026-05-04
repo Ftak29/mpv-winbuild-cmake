@@ -89,9 +89,10 @@ jobs:
         run: |
           python -m venv "$PWD/meson-venv"
           "$PWD/meson-venv/bin/python" -m pip install --upgrade pip
-          "$PWD/meson-venv/bin/python" -m pip install "meson>=1.11.0"
+          "$PWD/meson-venv/bin/python" -m pip install "meson>=1.11.0" jinja2
           echo "$PWD/meson-venv/bin" >> $GITHUB_PATH
-          "$PWD/meson-venv/bin/meson" --version          
+          "$PWD/meson-venv/bin/meson" --version
+          "$PWD/meson-venv/bin/python" -c "import jinja2; print('jinja2 ok')"        
           
       - name: Configuring CMake & Downloading source
         run: |
