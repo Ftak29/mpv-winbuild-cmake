@@ -87,7 +87,7 @@ ExternalProject_Add(mpv
     PATCH_COMMAND
       ${CMAKE_COMMAND} -E env
         MPV_SOURCE_DIR=<SOURCE_DIR>
-        TVEZ_LIB_VER=TVEZLibWin-1.2
+        TVEZ_LIB_VER=TVEZLibWin-1.3
       /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh          
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
