@@ -67,6 +67,18 @@ ExternalProject_Add(mpv-release
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
 )
 
+ExternalProject_Add_Step(mpv patch-version-header
+    DEPENDEES configure
+    DEPENDERS build
+    COMMAND ${CMAKE_COMMAND} -E env
+        MPV_SOURCE_DIR=<SOURCE_DIR>
+        MPV_BUILD_DIR=<BINARY_DIR>
+        TVEZ_LIB_VER=TVEZLibW-1.3
+        /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh
+    COMMENT "Patching mpv version header"
+    LOG 1
+)
+
 ExternalProject_Add_Step(mpv-release copy-versionfile
     DEPENDEES download
     DEPENDERS configure
