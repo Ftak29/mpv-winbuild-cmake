@@ -1,33 +1,54 @@
 #!/bin/bash
 set -euo pipefail
 
-cd "$MPV_SOURCE_DIR"
+: "${MPV_SOURCE_DIR:?}"
+: "${TVEZ_LIB_VER:?}"
 
-base_ver="$(tr -d '\r\n' < MPV_VERSION)"
+base_ver="$(tr -d '\r\n' < "$MPV_SOURCE_DIR/MPV_VERSION")"
+base_ver="$(printf '%s\n' "$base_ver" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
 
-# Avoid duplicating your custom prefix if the patch step runs again.
-if [[ "$base_ver" == "${TVEZ_LIB_VER} "* ]]; then
-    new_ver="$base_ver"
-else
-    new_ver="${TVEZ_LIB_VER} ${base_ver}"
-fi
+wanted_no_v="${base_ver} ${TVEZ_LIB_VER}"
+wanted="v${wanted_no_v}"
 
-printf '%s\n' "$new_ver" > MPV_VERSION
+# Post-Meson mode: patch generated version.h.
+# This is the mode you want for the git mpv build.
+if [[ -n "${MPV_BUILD_DIR:-}" ]]; then
+    header="${MPV_BUILD_DIR}/common/version.h"
 
-echo "Patched MPV_VERSION=$(cat MPV_VERSION)"
-
-# Only commit when the mpv source is a git checkout.
-# This keeps packages/mpv-release.cmake working, because that one uses a tarball.
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    git config user.name "local-build"
-    git config user.email "local-build@example.invalid"
-
-    git add MPV_VERSION
-
-    if ! git diff --cached --quiet; then
-        git commit -m "Set custom mpv version"
-        echo "Committed custom MPV_VERSION: $(git rev-parse --short=12 HEAD)"
-    else
-        echo "No MPV_VERSION change to commit"
+    if [[ ! -f "$header" ]]; then
+        echo "ERROR: version.h not found: $header"
+        find "$MPV_BUILD_DIR" -name version.h -print || true
+        exit 1
     fi
+
+    python3 - "$header" "$wanted" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+wanted = sys.argv[2]
+escaped = wanted.replace("\\", "\\\\").replace('"', '\\"')
+
+text = path.read_text()
+new = re.sub(
+    r'#define VERSION\s+"[^"]*"',
+    f'#define VERSION "{escaped}"',
+    text,
+    count=1,
+)
+
+if new == text:
+    raise SystemExit(f"VERSION define not found in {path}")
+
+path.write_text(new)
+print(f'Patched {path}: VERSION="{wanted}"')
+PY
+
+    exit 0
 fi
+
+# Pre-configure fallback mode.
+# Useful only for mpv-release tarball builds without .git.
+printf '%s\n' "$wanted_no_v" > "$MPV_SOURCE_DIR/MPV_VERSION"
+echo "Patched MPV_VERSION=$(cat "$MPV_SOURCE_DIR/MPV_VERSION")"
