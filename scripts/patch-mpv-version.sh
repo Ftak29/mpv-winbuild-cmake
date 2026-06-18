@@ -4,23 +4,39 @@ set -euo pipefail
 : "${MPV_SOURCE_DIR:?}"
 : "${TVEZ_LIB_VER:?}"
 
-mpv_version_file="$MPV_SOURCE_DIR/MPV_VERSION"
+meson_file="$MPV_SOURCE_DIR/common/meson.build"
 
-if [[ ! -f "$mpv_version_file" ]]; then
-    echo "ERROR: MPV_VERSION not found: $mpv_version_file"
+if [[ ! -f "$meson_file" ]]; then
+    echo "ERROR: common/meson.build not found: $meson_file"
     exit 1
 fi
 
-base_ver="$(tr -d '\r\n' < "$mpv_version_file")"
-base_ver="$(printf '%s\n' "$base_ver" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -n1)"
+python3 - "$meson_file" "$TVEZ_LIB_VER" <<'PY'
+import pathlib
+import sys
 
-if [[ -z "$base_ver" ]]; then
-    echo "ERROR: could not parse base mpv version from $mpv_version_file"
-    cat "$mpv_version_file"
-    exit 1
-fi
+path = pathlib.Path(sys.argv[1])
+suffix = sys.argv[2]
 
-wanted_no_v="${base_ver} ${TVEZ_LIB_VER}"
+text = path.read_text()
 
-printf '%s\n' "$wanted_no_v" > "$mpv_version_file"
-echo "Patched MPV_VERSION=$(cat "$mpv_version_file")"
+# Do not let git describe add "-dirty".
+text = text.replace(', "--dirty"', '')
+text = text.replace(", '--dirty'", '')
+
+old = 'sys.stdout.write(ver)'
+new = f'ver = ver.strip()\nsys.stdout.write(ver + " {suffix}")'
+
+if f'ver + " {suffix}"' in text:
+    print(f"Already patched {path}")
+    path.write_text(text)
+    sys.exit(0)
+
+if old not in text:
+    raise SystemExit(f"Could not find '{old}' in {path}")
+
+text = text.replace(old, new, 1)
+path.write_text(text)
+
+print(f"Patched {path}: append '{suffix}' and removed --dirty")
+PY
