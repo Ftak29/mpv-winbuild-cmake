@@ -84,11 +84,7 @@ ExternalProject_Add(mpv
         -Dvapoursynth=enabled
         ${mpv_gl}
         -Dc_args=-Wno-error=int-conversion
-    PATCH_COMMAND
-      ${CMAKE_COMMAND} -E env
-        MPV_SOURCE_DIR=<SOURCE_DIR>
-        TVEZ_LIB_VER=TVEZLibW-1.3
-      /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh          
+    PATCH_COMMAND ""
     BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
     INSTALL_COMMAND ""
     LOG_DOWNLOAD 1
