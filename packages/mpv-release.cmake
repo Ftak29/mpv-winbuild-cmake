@@ -31,11 +31,7 @@ ExternalProject_Add(mpv-release
     URL ${LINK}
 
     SOURCE_DIR ${SOURCE_LOCATION}
-    PATCH_COMMAND
-      ${CMAKE_COMMAND} -E env
-        MPV_SOURCE_DIR=<SOURCE_DIR>
-        TVEZ_LIB_VER=TVEZLibW-1.3
-        /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh
+    PATCH_COMMAND ""
         
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
