@@ -1,7 +1,3 @@
-set(FFMPEG_LOCAL_PATCH
-    ${CMAKE_CURRENT_LIST_DIR}/patches/0001-ffmpeg-cc.patch
-)
-
 ExternalProject_Add(ffmpeg
     DEPENDS
         amf-headers
@@ -54,7 +50,7 @@ ExternalProject_Add(ffmpeg
     GIT_CLONE_FLAGS "--sparse --filter=tree:0"
     GIT_CLONE_POST_COMMAND "sparse-checkout set --no-cone /* !tests/ref/fate"
     UPDATE_COMMAND ""
-    PATCH_COMMAND git -C <SOURCE_DIR> apply --ignore-space-change --ignore-whitespace --allow-empty ${FFMPEG_LOCAL_PATCH}
+    PATCH_COMMAND ""
     CONFIGURE_COMMAND ${EXEC} CONF=1 <SOURCE_DIR>/configure
         --cross-prefix=${TARGET_ARCH}-
         --prefix=${MINGW_INSTALL_PREFIX}
