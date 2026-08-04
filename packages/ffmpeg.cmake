@@ -94,7 +94,7 @@ ExternalProject_Add(ffmpeg
         --enable-libxml2
         --enable-libmysofa
         --enable-libssh
-        --enable-libsrt
+        --disable-libsrt
         --enable-libvpl
         --enable-libjxl
         --enable-libplacebo
