@@ -8,7 +8,6 @@ ExternalProject_Add(ffmpeg
         lcms2
         openssl
         libssh
-        libsrt
         libass
         libbluray
         libdvdnav
