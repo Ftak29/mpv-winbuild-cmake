@@ -73,7 +73,7 @@ ExternalProject_Add_Step(mpv-release patch-version-header
     COMMAND ${CMAKE_COMMAND} -E env
         MPV_SOURCE_DIR=<SOURCE_DIR>
         MPV_BUILD_DIR=<BINARY_DIR>
-        TVEZ_LIB_VER=TVEZLibW-1.4
+        TVEZ_LIB_VER=TVEZLibW-1.5
         /bin/bash ${CMAKE_SOURCE_DIR}/scripts/patch-mpv-version.sh
     COMMENT "Patching mpv-release version header"
     LOG 1
