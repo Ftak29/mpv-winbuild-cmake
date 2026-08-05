@@ -84,15 +84,17 @@ ExternalProject_Add(mpv
         -Dvapoursynth=enabled
         ${mpv_gl}
         -Dc_args=-Wno-error=int-conversion
-    PATCH_COMMAND ""
-    BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
-    INSTALL_COMMAND ""
-    LOG_DOWNLOAD 1
-    LOG_UPDATE 1
-    LOG_CONFIGURE 1
-    LOG_BUILD 1
-    LOG_INSTALL 1
-)
+    PATCH_COMMAND
+        ${EXEC} git apply
+        ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-disable-angle-d3d9.patch    
+        BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
+        INSTALL_COMMAND ""
+        LOG_DOWNLOAD 1
+        LOG_UPDATE 1
+        LOG_CONFIGURE 1
+        LOG_BUILD 1
+        LOG_INSTALL 1
+    )
 
 ExternalProject_Add_Step(mpv patch-version-header
     DEPENDEES patch
