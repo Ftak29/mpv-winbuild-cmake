@@ -1,0 +1,62 @@
+diff --git a/video/out/opengl/context_angle.c b/video/out/opengl/context_angle.c
+--- a/video/out/opengl/context_angle.c
++++ b/video/out/opengl/context_angle.c
+@@
+ enum {
+     RENDERER_AUTO,
++#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
+     RENDERER_D3D9,
++#endif
+     RENDERER_D3D11,
+ };
+@@
+         {"angle-renderer", OPT_CHOICE(renderer,
+             {"auto", RENDERER_AUTO},
++#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
+             {"d3d9", RENDERER_D3D9},
++#endif
+             {"d3d11", RENDERER_D3D11})},
+@@
+-static void d3d9_device_destroy(struct ra_ctx *ctx)
++#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
++static void d3d9_device_destroy(struct ra_ctx *ctx)
+ {
+     struct priv *p = ctx->priv;
+ 
+@@
+     }
+     return true;
+ }
++#endif
+ 
+ static void egl_window_surface_destroy(struct ra_ctx *ctx)
+@@
+     // Uninit the EGL device implementation that is being used
+     if (p->d3d11_device)
+         d3d11_device_destroy(ctx);
++#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
+     else
+         d3d9_device_destroy(ctx);
++#endif
+ 
+     vo_w32_uninit(ctx->vo);
+ }
+@@
+     if ((!context_ok && !o->renderer) || o->renderer == RENDERER_D3D11) {
+         context_ok = d3d11_device_create(ctx);
+         if (context_ok) {
+@@
+                 d3d11_device_destroy(ctx);
+         }
+     }
++#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
+     if ((!context_ok && !o->renderer) || o->renderer == RENDERER_D3D9) {
+         context_ok = d3d9_device_create(ctx);
+         if (context_ok) {
+@@
+                 d3d9_device_destroy(ctx);
+         }
+     }
++#endif
+     if (!context_ok)
+         goto fail;
