@@ -56,6 +56,7 @@ ExternalProject_Add(mpv
     SOURCE_DIR ${SOURCE_LOCATION}
     GIT_CLONE_FLAGS "--filter=tree:0"
     UPDATE_COMMAND ""
+    PATCH_COMMAND ""    
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
@@ -84,9 +85,6 @@ ExternalProject_Add(mpv
         -Dvapoursynth=enabled
         ${mpv_gl}
         -Dc_args=-Wno-error=int-conversion
-    PATCH_COMMAND
-        ${EXEC} git apply
-        ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-disable-angle-d3d9.patch    
         BUILD_COMMAND ${EXEC} LTO_JOB=1 PDB=1 ninja -C <BINARY_DIR>
         INSTALL_COMMAND ""
         LOG_DOWNLOAD 1
