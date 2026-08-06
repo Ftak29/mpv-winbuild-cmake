@@ -1,7 +1,8 @@
 diff --git a/video/out/opengl/context_angle.c b/video/out/opengl/context_angle.c
+index 6d2ee9f..ce7e751 100644
 --- a/video/out/opengl/context_angle.c
 +++ b/video/out/opengl/context_angle.c
-@@
+@@ -43,6 +43,8 @@
  enum {
      RENDERER_AUTO,
 +#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
@@ -9,28 +10,33 @@ diff --git a/video/out/opengl/context_angle.c b/video/out/opengl/context_angle.c
 +#endif
      RENDERER_D3D11,
  };
-@@
+ 
+@@ -59,6 +61,8 @@ const struct m_sub_options angle_conf = {
          {"angle-renderer", OPT_CHOICE(renderer,
              {"auto", RENDERER_AUTO},
 +#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
              {"d3d9", RENDERER_D3D9},
 +#endif
              {"d3d11", RENDERER_D3D11})},
-@@
--static void d3d9_device_destroy(struct ra_ctx *ctx)
+         {"angle-d3d11-warp", OPT_CHOICE(d3d11_warp,
+             {"auto", -1},
+@@ -288,6 +292,7 @@ fail:
+     return false;
+ }
+ 
 +#ifdef EGL_PLATFORM_ANGLE_TYPE_D3D9_ANGLE
-+static void d3d9_device_destroy(struct ra_ctx *ctx)
+ static void d3d9_device_destroy(struct ra_ctx *ctx)
  {
      struct priv *p = ctx->priv;
- 
-@@
+@@ -322,6 +327,7 @@ static bool d3d9_device_create(struct ra_ctx *ctx)
      }
      return true;
  }
 +#endif
  
  static void egl_window_surface_destroy(struct ra_ctx *ctx)
-@@
+ {
+@@ -424,8 +430,10 @@ static void angle_uninit(struct ra_ctx *ctx)
      // Uninit the EGL device implementation that is being used
      if (p->d3d11_device)
          d3d11_device_destroy(ctx);
@@ -41,11 +47,7 @@ diff --git a/video/out/opengl/context_angle.c b/video/out/opengl/context_angle.c
  
      vo_w32_uninit(ctx->vo);
  }
-@@
-     if ((!context_ok && !o->renderer) || o->renderer == RENDERER_D3D11) {
-         context_ok = d3d11_device_create(ctx);
-         if (context_ok) {
-@@
+@@ -514,6 +522,7 @@ static bool angle_init(struct ra_ctx *ctx)
                  d3d11_device_destroy(ctx);
          }
      }
@@ -53,10 +55,11 @@ diff --git a/video/out/opengl/context_angle.c b/video/out/opengl/context_angle.c
      if ((!context_ok && !o->renderer) || o->renderer == RENDERER_D3D9) {
          context_ok = d3d9_device_create(ctx);
          if (context_ok) {
-@@
+@@ -523,6 +532,7 @@ static bool angle_init(struct ra_ctx *ctx)
                  d3d9_device_destroy(ctx);
          }
      }
 +#endif
      if (!context_ok)
          goto fail;
+ 
