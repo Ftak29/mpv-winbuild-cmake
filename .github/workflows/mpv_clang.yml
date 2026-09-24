@@ -1,181 +1,140 @@
 name: mpv clang
+
+on:
+  workflow_dispatch:
+
 defaults:
   run:
     shell: bash
 
-on:
-  workflow_dispatch:
-    inputs:
-      command:
-        description: 'Run custom command before building'
-        required: false
-        type: string
-
 jobs:
   build_mpv:
-    name: Building mpv
+    name: Building mpv (x86_64)
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        bit: [x86_64]
-    env:
-      BIT: ${{ matrix.bit }}
+
     container:
       image: docker://ghcr.io/shinchiro/archlinux:latest
-    outputs:
-      mpv_ver: ${{ steps.build_mpv_step.outputs.mpv_ver }}
+
+    env:
+      BIT: x86_64
+      ARCH: x86_64
+
     steps:
-      - name: Init variable
-        run: |
-          if [[ $BIT == "i686" ]]; then
-            echo "arch=i686" >> $GITHUB_ENV
-          elif [[ $BIT == "x86_64" ]]; then
-            echo "arch=x86_64" >> $GITHUB_ENV
-          elif [[ $BIT == "x86_64_v3" ]]; then
-            echo "arch=x86_64" >> $GITHUB_ENV
-            echo "x86_64_level=-v3" >> $GITHUB_ENV
-            echo "x86_64_v3_ARCH=-DGCC_ARCH=x86-64-v3" >> $GITHUB_ENV
-          elif [[ $BIT == "aarch64" ]]; then
-            echo "arch=aarch64" >> $GITHUB_ENV
-          fi
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: master
 
       - name: Setup git config
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git config --global pull.rebase true
-          git config --global rebase.autoStash true
-          git config --global fetch.prune true
-          git config --global --add safe.directory $PWD
+          git config --global --add safe.directory "$PWD"
 
-      - uses: actions/checkout@main
+      - name: Restore clang sysroot cache
+        uses: actions/cache/restore@v6
         with:
-          ref: master
-
-      - name: Loading clang sysroot cache
-        uses: actions/cache/restore@main
-        with:
-          path: |
-            clang_root
+          path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang_root
 
-      - name: Loading repository cache
-        uses: actions/cache/restore@main
+      - name: Restore repository cache
+        uses: actions/cache/restore@v6
         with:
           path: src_packages
           key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-repository
 
-      - name: Loading ${{ matrix.bit }} toolchain cache
-        uses: actions/cache/restore@main
+      - name: Restore build cache
+        uses: actions/cache/restore@v6
         with:
-          path: |
-            build_${{ matrix.bit }}
-          key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
+          path: build_${{ env.BIT }}
+          key: ${{ secrets.CACHE_VERSION }}-clang-${{ env.BIT }}_toolchain-${{ github.run_id }}
           restore-keys: |
-            ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain
+            ${{ secrets.CACHE_VERSION }}-clang-${{ env.BIT }}_toolchain
 
-      - name: Running custom command
-        if: ${{ github.event.inputs.command != '' }}
-        continue-on-error: true
-        run: ${{ github.event.inputs.command }}
-
-      - name: Configuring CMake & Downloading source
+      - name: Configure CMake
         run: |
-          cmake -DTARGET_ARCH=${{ env.arch }}-w64-mingw32 -DCOMPILER_TOOLCHAIN=clang ${{ env.x86_64_v3_ARCH }} -DCMAKE_INSTALL_PREFIX=$PWD/clang_root -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 -DSINGLE_SOURCE_LOCATION=$PWD/src_packages -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup -DENABLE_CCACHE=ON -DCLANG_PACKAGES_LTO=ON -G Ninja --fresh -B build_$BIT -S $PWD
+          cmake \
+            -DTARGET_ARCH=$ARCH-w64-mingw32 \
+            -DCOMPILER_TOOLCHAIN=clang \
+            -DCMAKE_INSTALL_PREFIX=$PWD/clang_root \
+            -DMINGW_INSTALL_PREFIX=$PWD/build_$BIT/$BIT-w64-mingw32 \
+            -DSINGLE_SOURCE_LOCATION=$PWD/src_packages \
+            -DRUSTUP_LOCATION=$PWD/clang_root/install_rustup \
+            -DENABLE_CCACHE=ON \
+            -DCLANG_PACKAGES_LTO=ON \
+            -G Ninja \
+            --fresh \
+            -B build_$BIT \
+            -S $PWD
+
           ninja -C build_$BIT download || true
 
-      - name: Building mpv
-        id: build_mpv_step
-        env:
-          MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
+      - name: Build mpv
         run: |
           ninja -C build_$BIT update
-          echo "Cleaning cached subrandr Rust objects"
-          rm -rf "$PWD/src_packages/subrandr/target"
-          ninja -C build_$BIT subrandr-fullclean || true
-          ninja -C build_$BIT subrandr          
-          $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
-          $MPV_TARBALL && echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT || echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
+          ninja -C build_$BIT mpv
 
-      - name: Packaging mpv
+      - name: Package mpv
         run: |
           mkdir -p release_$BIT
-          ninja -C build_$BIT mpv-packaging; mv build_$BIT/mpv*.7z release_$BIT
+          ninja -C build_$BIT mpv-packaging
+          mv build_$BIT/mpv*.7z release_$BIT/
 
-      - name: Copying ffmpeg
-        run: |
-          hash=$(git -C src_packages/ffmpeg rev-parse --short HEAD)
-          7z a -m0=lzma2 -mx=9 -ms=on release_$BIT/ffmpeg-${{ env.arch }}${{ env.x86_64_level }}-git-$hash.7z ./build_$BIT/$BIT-w64-mingw32/bin/ffmpeg.exe
-
-      - name: Collecting logs
+      - name: Collect logs
         if: always()
         run: |
           mkdir -p build_${BIT}_logs
-          cp -fr $(find build_$BIT -type f -iname "*-*.log" -or -wholename "*/ffbuild/config.log") build_${BIT}_logs || true
-          7z a -m0=lzma2 -mx=9 -ms=on logs.7z build*logs
 
-      - name: Uploading logs
-        uses: actions/upload-artifact@master
+          find build_$BIT -type f \
+            \( -iname "*-*.log" -o -path "*/ffbuild/config.log" \) \
+            -exec cp --parents {} build_${BIT}_logs/ \; || true
+
+      - name: Upload logs
         if: always()
+        uses: actions/upload-artifact@v7
         with:
-          name: mpv-${{ matrix.bit }}-logs
-          path: logs.7z
+          name: mpv-${{ env.BIT }}-logs
+          path: build_${{ env.BIT }}_logs
           retention-days: 1
 
-      - name: Uploading ${{ matrix.bit }} build
-        uses: actions/upload-artifact@master
+      - name: Upload mpv
+        uses: actions/upload-artifact@v7
         with:
-          name: mpv-${{ matrix.bit }}
-          path: release_${{ matrix.bit }}/mpv-${{ env.arch }}*
+          name: mpv-${{ env.BIT }}
+          path: release_${{ env.BIT }}/mpv-x86_64*
+          if-no-files-found: error
 
-      - name: Uploading ${{ matrix.bit }} debug
-        uses: actions/upload-artifact@master
-        with:
-          name: mpv-${{ matrix.bit }}-debug
-          path: release_${{ matrix.bit }}/mpv-debug-${{ env.arch }}*
-
-      - name: Cleaning build directory
+      - name: Clean mpv build
         if: always()
         run: |
           rm -rf build_$BIT/mpv*
-          rm -rf release_$BIT/mpv-debug*.7z
 
-      - name: Cleaning rust toolchain directory
+      - name: Clean Rust cache
         if: always()
         run: |
-          ninja -C build_$BIT cargo-clean
+          ninja -C build_$BIT cargo-clean || true
 
-      - name: Saving clang sysroot cache
-        uses: actions/cache/save@main
-        if: ${{ always() && matrix.bit == 'x86_64' }}
+      - name: Save clang sysroot cache
+        if: always()
+        uses: actions/cache/save@v6
         with:
-          path: |
-            clang_root
+          path: clang_root
           key: ${{ secrets.CACHE_VERSION }}-clang_root-${{ github.run_id }}
 
-      - name: Saving repository cache
-        uses: actions/cache/save@main
-        if: ${{ always() && matrix.bit == 'x86_64' }}
+      - name: Save repository cache
+        if: always()
+        uses: actions/cache/save@v6
         with:
           path: src_packages
           key: ${{ secrets.CACHE_VERSION }}-repository-${{ github.run_id }}
 
-      - name: Saving ${{ matrix.bit }} toolchain cache
-        uses: actions/cache/save@main
+      - name: Save build cache
         if: always()
+        uses: actions/cache/save@v6
         with:
-          path: |
-            build_${{ matrix.bit }}
-          key: ${{ secrets.CACHE_VERSION }}-clang-${{ matrix.bit }}_toolchain-${{ github.run_id }}
-
-      - name: Saving release_${{ matrix.bit }} cache
-        uses: actions/cache/save@main
-        with:
-          path: release_${{ matrix.bit }}
-          key: ${{ secrets.CACHE_VERSION }}-release_${{ matrix.bit }}-${{ github.run_id }}
+          path: build_${{ env.BIT }}
+          key: ${{ secrets.CACHE_VERSION }}-clang-${{ env.BIT }}_toolchain-${{ github.run_id }}
