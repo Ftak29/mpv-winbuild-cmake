@@ -108,6 +108,13 @@ jobs:
           path: release_${{ env.BIT }}/mpv-x86_64*
           if-no-files-found: error
 
+      - name: Upload libmpv
+        uses: actions/upload-artifact@v7
+        with:
+          name: libmpv-x86_64
+          path: release_x86_64/mpv-dev-x86_64-*.7z
+          if-no-files-found: error
+          
       - name: Clean mpv build
         if: always()
         run: |
