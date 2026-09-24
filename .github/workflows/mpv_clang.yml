@@ -111,6 +111,10 @@ jobs:
           MPV_TARBALL: ${{ github.event.inputs.mpv_tarball }}
         run: |
           ninja -C build_$BIT update
+          echo "Cleaning cached subrandr Rust objects"
+          rm -rf "$PWD/src_packages/subrandr/target"
+          ninja -C build_$BIT subrandr-fullclean || true
+          ninja -C build_$BIT subrandr          
           $MPV_TARBALL && ninja -C build_$BIT mpv-release || ninja -C build_$BIT mpv
           $MPV_TARBALL && echo "mpv_ver=$(cat build_$BIT/packages/mpv-release-prefix/VERSION)" >> $GITHUB_OUTPUT || echo "mpv_ver=UNKNOWN" >> $GITHUB_OUTPUT
 
