@@ -14,7 +14,6 @@ ExternalProject_Add(subrandr
     BUILD_COMMAND ${EXEC}
         LD_PRELOAD=
         CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
-        ${cargo_lto_rustflags}
         cargo -Z unstable-options -C <SOURCE_DIR> xtask install
         --prefix ${MINGW_INSTALL_PREFIX}
         --target ${TARGET_CPU}-pc-windows-${rust_target}
