@@ -37,7 +37,10 @@ if(TARGET_CPU STREQUAL "x86_64")
     set(openssl_target "mingw64")
     set(openssl_ec_opt "enable-ec_nistp_64_gcc_128")
     set(libvpx_target "x86_64-win64-gcc")
-    set(mpv_gl "-Dgl=enabled -Degl-angle=enabled")
+    set(mpv_gl
+        -Dgl=enabled
+        -Degl-angle=enabled
+    )    
     set(xxhash_dispatch "-DDISPATCH=ON")
     set(xxhash_cflags "-DXXH_X86DISPATCH_ALLOW_AVX=1")
     set(ffmpeg_uavs3d "uavs3d")
