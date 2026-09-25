@@ -5,6 +5,6 @@ diff --git a/common/version.c b/common/version.c
  #include "version.h"
  
 -const char mpv_version[]  = "mpv " VERSION;
-+const char mpv_version[]  = "mpv v0.41.0-TVEZLibW-2.0";
++const char mpv_version[]  = "mpv v0.41.0 TVEZLibW-2.0";
  const char mpv_builddate[] = BUILDDATE;
  const char mpv_copyright[] = MPVCOPYRIGHT;
