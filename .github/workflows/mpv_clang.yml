@@ -90,6 +90,7 @@ jobs:
       - name: Build mpv
         run: |
           ninja -C build_$BIT update
+          ninja -C build_$BIT mpv-fullclean
           ninja -C build_$BIT mpv
 
       - name: Package mpv
