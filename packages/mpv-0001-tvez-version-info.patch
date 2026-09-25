@@ -1,0 +1,14 @@
+diff --git a/osdep/mpv.rc b/osdep/mpv.rc
+--- a/osdep/mpv.rc
++++ b/osdep/mpv.rc
+@@ -32,8 +32,8 @@ VS_VERSION_INFO VERSIONINFO
+                 VALUE "FileVersion", VERSION
+                 VALUE "LegalCopyright", MPVCOPYRIGHT_W
+                 VALUE "OriginalFilename", "mpv.exe"
+-                VALUE "ProductName", "mpv"
+-                VALUE "ProductVersion", VERSION
++                VALUE "ProductName", "MPV-TVEZ"
++                VALUE "ProductVersion", "v0.41.0 TvEzLibW-2.0"
+             }
+         }
+         BLOCK "VarFileInfo" {
