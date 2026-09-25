@@ -2,6 +2,11 @@ name: mpv clang
 
 on:
   workflow_dispatch:
+    inputs:
+      pre_build_script:
+        description: 'Optional shell command(s) to run before build'
+        required: false
+        type: string
 
 defaults:
   run:
@@ -55,6 +60,15 @@ jobs:
           restore-keys: |
             ${{ secrets.CACHE_VERSION }}-clang-${{ env.BIT }}_toolchain
 
+      - name: Run custom pre-build script
+        if: ${{ inputs.pre_build_script != '' }}
+        env:
+          PRE_BUILD_SCRIPT: ${{ inputs.pre_build_script }}
+        run: |
+          echo "Running custom pre-build script:"
+          echo "$PRE_BUILD_SCRIPT"
+          bash -euo pipefail -c "$PRE_BUILD_SCRIPT"
+
       - name: Configure CMake
         run: |
           cmake \
@@ -105,16 +119,16 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: mpv-${{ env.BIT }}
-          path: release_${{ env.BIT }}/mpv-x86_64*
+          path: release_${{ env.BIT }}/mpv-x86_64-*.7z
           if-no-files-found: error
 
       - name: Upload libmpv
         uses: actions/upload-artifact@v7
         with:
           name: libmpv-x86_64
-          path: release_x86_64/mpv-dev-x86_64-*.7z
+          path: release_${{ env.BIT }}/mpv-dev-x86_64-*.7z
           if-no-files-found: error
-          
+
       - name: Clean mpv build
         if: always()
         run: |
