@@ -31,6 +31,7 @@ ExternalProject_Add(mpv
     PATCH_COMMAND
         git -C <SOURCE_DIR> apply
         ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0001-tvez-version-info.patch
+        COMMAND python3 ${CMAKE_CURRENT_SOURCE_DIR}/mpv-0002-tvez-text-sub-lavc-options.py <SOURCE_DIR>
     CONFIGURE_COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
         --prefix=${MINGW_INSTALL_PREFIX}
         --libdir=${MINGW_INSTALL_PREFIX}/lib
