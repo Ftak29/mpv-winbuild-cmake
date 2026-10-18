@@ -1,0 +1,43 @@
+diff --git a/libavcodec/ccaption_dec.c b/libavcodec/ccaption_dec.c
+--- a/libavcodec/ccaption_dec.c
++++ b/libavcodec/ccaption_dec.c
+@@ -16,4 +16,7 @@
+     int real_time_latency_msec;
+     int data_field;
++    /* -1 = legacy behavior, 0 = CC1/CC3, 1 = CC2/CC4. */
++    int cc_channel;
++    int active_cc_channel;
+     struct Screen screen[2];
+     int active_screen;
+@@ -37,4 +40,6 @@
+     ctx->cursor_charset = 0;
+     ctx->active_screen = 0;
++    /* CEA-608 text pairs inherit the service of the last control/preamble. */
++    ctx->active_cc_channel = 0;
+     ctx->last_real_time = 0;
+     ctx->screen_touched = 0;
+@@ -56,5 +61,17 @@
+             continue;
+ 
+-        ret = process_cc608(ctx, hi & 0x7f, bptr[i + 2] & 0x7f);
++        /* CEA-608 field selection is not enough to select CC1 over CC2.
++         * Channel 2 control/preamble/extended pairs use 0x18..0x1f;
++         * channel 1 uses 0x10..0x17. Plain characters (0x20..0x7f)
++         * inherit the most recently signalled channel for this field.
++         */
++        hi &= 0x7f;
++        uint8_t lo = bptr[i + 2] & 0x7f;
++        if (hi >= 0x10 && hi <= 0x1f && lo >= 0x20)
++            ctx->active_cc_channel = (hi & 0x08) != 0;
++        if (ctx->cc_channel >= 0 && ctx->active_cc_channel != ctx->cc_channel)
++            continue;
++
++        ret = process_cc608(ctx, hi, lo);
+         if (ret < 0)
+             return ret;
+@@ -75,4 +92,5 @@
+     { "real_time_latency_msec", "minimum elapsed time between emitting real-time subtitle events", OFFSET(real_time_latency_msec), AV_OPT_TYPE_INT, { .i64 = 200 }, 0, 500, SD },
+     { "data_field", "select data field", OFFSET(data_field), AV_OPT_TYPE_INT, { .i64 = -1 }, -1, 1, SD, .unit = "data_field" },
++    { "cc_channel", "select CEA-608 channel within a data field (-1=both, 0=first, 1=second)", OFFSET(cc_channel), AV_OPT_TYPE_INT, { .i64 = 0 }, -1, 1, SD },
+     { "auto",   "pick first one that appears", 0, AV_OPT_TYPE_CONST, { .i64 =-1 }, 0, 0, SD, .unit = "data_field" },
+     { "first", NULL, 0, AV_OPT_TYPE_CONST, { .i64 = 0 }, 0, 0, SD, .unit = "data_field" },
