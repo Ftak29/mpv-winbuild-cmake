@@ -10,7 +10,8 @@ ExternalProject_Add(fontconfig
     GIT_REMOTE_NAME origin
     GIT_TAG main
     GIT_CLONE_FLAGS "--filter=tree:0"
-    PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/fontconfig-*.patch
+    # PATCH_COMMAND ${EXEC} git am --3way ${CMAKE_CURRENT_SOURCE_DIR}/fontconfig-*.patch
+    PATCH_COMMAND ""
     CONFIGURE_COMMAND ""
     COMMAND ${EXEC} sed -i "s/both_libraries/library/g" <SOURCE_DIR>/src/meson.build
     COMMAND ${EXEC} CONF=1 meson setup <BINARY_DIR> <SOURCE_DIR>
