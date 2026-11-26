@@ -9,7 +9,7 @@ import subprocess
 import sys
 
 REL = "libavcodec/ccaption_dec.c"
-PINNED = "n9.0.2"
+PINNED = "n9.1"
 
 
 def git(source, *args):
