@@ -124,7 +124,7 @@ ExternalProject_Add(ffmpeg
     LOG_DOWNLOAD 1 LOG_UPDATE 1 LOG_CONFIGURE 1 LOG_BUILD 1 LOG_INSTALL 1
 )
 
-set_property(TARGET ffmpeg PROPERTY _EP_GIT_RESET n9.0.2)
+set_property(TARGET ffmpeg PROPERTY _EP_GIT_RESET n9.1)
 
 force_rebuild_git(ffmpeg)
 cleanup(ffmpeg install)
