@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Forward MPV v0.41.0 --sub-lavc-o to the text subtitle decoder.
+"""Forward MPV v0.42.0 --sub-lavc-o to the text subtitle decoder.
 
 Use the avcodec_open2() call within lavc_conv_create() instead of matching
 several adjacent source lines, which can differ across cached checkouts.
@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 REL = 'sub/lavc_conv.c'
-TAG = 'v0.41.0'
+TAG = 'v0.42.0'
 FUNC_START = 'struct lavc_conv *lavc_conv_create('
 FUNC_END = 'char *lavc_conv_get_extradata('
 OPTION_CALL = 'mp_set_avopts(sd->log, avctx, sd->opts->sub_avopts);'
